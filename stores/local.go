@@ -198,6 +198,7 @@ func (st *Local) reportHealth(ctx context.Context) {
 }
 
 func (st *Local) AcquireSector(ctx context.Context, sid abi.SectorID, spt abi.RegisteredSealProof, existing SectorFileType, allocate SectorFileType, pathType PathType, op AcquireMode) (SectorPaths, SectorPaths, error) {
+	log.Warnf("jackoelv:local:AcquireSector")
 	if existing|allocate != existing^allocate {
 		return SectorPaths{}, SectorPaths{}, xerrors.New("can't both find and allocate a sector")
 	}
@@ -402,7 +403,7 @@ func (st *Local) MoveStorage(ctx context.Context, s abi.SectorID, spt abi.Regist
 	if err != nil {
 		return xerrors.Errorf("acquire dest storage: %w", err)
 	}
-
+	log.Infof("jackoelv:local:MoveStorage:AcquireSector")
 	src, srcIds, err := st.AcquireSector(ctx, s, spt, types, FTNone, false, AcquireMove)
 	if err != nil {
 		return xerrors.Errorf("acquire src storage: %w", err)

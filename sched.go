@@ -166,10 +166,12 @@ func (sh *scheduler) runSched() {
 	for {
 		select {
 		case w := <-sh.newWorkers:
+			// log.Warnf("jackoelv:sched:newWorkers")
 			sh.schedNewWorker(w)
 		case wid := <-sh.workerClosing:
 			sh.schedDropWorker(wid)
 		case req := <-sh.schedule:
+			// log.Warnf("jackoelv:sched:schedule then maybeSchedRequest")
 			scheduled, err := sh.maybeSchedRequest(req)
 			if err != nil {
 				req.respond(err)
@@ -228,6 +230,7 @@ func (sh *scheduler) onWorkerFreed(wid WorkerID) {
 var selectorTimeout = 5 * time.Second
 
 func (sh *scheduler) maybeSchedRequest(req *workerRequest) (bool, error) {
+	// log.Warnf("jackoelv:sched:maybeSchedRequest")
 	sh.workersLk.Lock()
 	defer sh.workersLk.Unlock()
 
@@ -238,7 +241,10 @@ func (sh *scheduler) maybeSchedRequest(req *workerRequest) (bool, error) {
 
 	for wid, worker := range sh.workers {
 		rpcCtx, cancel := context.WithTimeout(req.ctx, selectorTimeout)
+		// log.Warnf("jackoelv:sched:maybeSchedRequest:req.taskType: %s, wid: %s, ok: %s",req.taskType,wid,ok)
 		ok, err := req.sel.Ok(rpcCtx, req.taskType, sh.spt, worker)
+		
+		log.Warnf("jackoelv:sched:maybeSchedRequest:req.taskType: %s, wid: %s, ok: %s",req.taskType,wid,ok)
 		cancel()
 
 		if err != nil {
@@ -251,9 +257,9 @@ func (sh *scheduler) maybeSchedRequest(req *workerRequest) (bool, error) {
 		tried++
 
 		if !canHandleRequest(needRes, sh.spt, wid, worker.info.Resources, worker.preparing) {
+			log.Warnf("jackoelv:sched:maybeSchedRequest:canHandleRequest,wid: %d",wid)
 			continue
 		}
-
 		acceptable = append(acceptable, wid)
 	}
 
@@ -265,6 +271,7 @@ func (sh *scheduler) maybeSchedRequest(req *workerRequest) (bool, error) {
 				rpcCtx, cancel := context.WithTimeout(req.ctx, selectorTimeout)
 				defer cancel()
 				r, err := req.sel.Cmp(rpcCtx, req.taskType, sh.workers[acceptable[i]], sh.workers[acceptable[j]])
+				// log.Warnf("jackoelv:sched:maybeSchedRequest:acceptable,winner r: %s",r)
 
 				if err != nil {
 					serr = multierror.Append(serr, err)
@@ -276,7 +283,7 @@ func (sh *scheduler) maybeSchedRequest(req *workerRequest) (bool, error) {
 				return false, xerrors.Errorf("error(s) selecting best worker: %w", serr)
 			}
 		}
-
+		log.Warnf("jackoelv:sched:maybeSchedRequest:return assignWorker true,acceptable[0]: %d; sector: %d",acceptable[0],req.sector)
 		return true, sh.assignWorker(acceptable[0], sh.workers[acceptable[0]], req)
 	}
 
@@ -288,6 +295,7 @@ func (sh *scheduler) maybeSchedRequest(req *workerRequest) (bool, error) {
 }
 
 func (sh *scheduler) assignWorker(wid WorkerID, w *workerHandle, req *workerRequest) error {
+	log.Warnf("jackoelv:sched:assignWorker,WorkerID:%d ; taskType: %s; sector: %d",wid,req.taskType,req.sector)
 	needRes := ResourceTable[req.taskType][sh.spt]
 
 	w.preparing.add(w.info.Resources, needRes)
@@ -315,7 +323,7 @@ func (sh *scheduler) assignWorker(wid WorkerID, w *workerHandle, req *workerRequ
 			}
 			return
 		}
-
+		log.Warnf("jackoelv:sched:assignWorker:ask worker for withResources,ID: %d", wid)
 		err = w.active.withResources(sh.spt, wid, w.info.Resources, needRes, &sh.workersLk, func() error {
 			w.preparing.free(w.info.Resources, needRes)
 			sh.workersLk.Unlock()
@@ -351,6 +359,7 @@ func (sh *scheduler) assignWorker(wid WorkerID, w *workerHandle, req *workerRequ
 }
 
 func (a *activeResources) withResources(spt abi.RegisteredSealProof, id WorkerID, wr storiface.WorkerResources, r Resources, locker sync.Locker, cb func() error) error {
+	// log.Warnf("jackoelv:sched:withResources")
 	for !canHandleRequest(r, spt, id, wr, a) {
 		if a.cond == nil {
 			a.cond = sync.NewCond(locker)
@@ -397,26 +406,34 @@ func (a *activeResources) free(wr storiface.WorkerResources, r Resources) {
 }
 
 func canHandleRequest(needRes Resources, spt abi.RegisteredSealProof, wid WorkerID, res storiface.WorkerResources, active *activeResources) bool {
-
+	// log.Warnf("jackoelv:sched:canHandleRequest")
 	// TODO: dedupe needRes.BaseMinMemory per task type (don't add if that task is already running)
 	minNeedMem := res.MemReserved + active.memUsedMin + needRes.MinMemory + needRes.BaseMinMemory
+	// log.Warnf("jackoelv:sched:canHandleRequest:minNeedMem:%d", minNeedMem)
+	// log.Warnf("jackoelv:sched:canHandleRequest:MemPhysical:%d", res.MemPhysical)
 	if minNeedMem > res.MemPhysical {
 		log.Debugf("sched: not scheduling on worker %d; not enough physical memory - need: %dM, have %dM", wid, minNeedMem/mib, res.MemPhysical/mib)
 		return false
 	}
 
 	maxNeedMem := res.MemReserved + active.memUsedMax + needRes.MaxMemory + needRes.BaseMinMemory
+	// log.Warnf("jackoelv:sched:canHandleRequest:maxNeedMem:%d", maxNeedMem)
 	if spt == abi.RegisteredSealProof_StackedDrg32GiBV1 {
 		maxNeedMem += MaxCachingOverhead
 	}
 	if spt == abi.RegisteredSealProof_StackedDrg64GiBV1 {
 		maxNeedMem += MaxCachingOverhead * 2 // ewwrhmwh
 	}
+	// log.Warnf("jackoelv:sched:canHandleRequest:MaxCachingOverhead:%d", MaxCachingOverhead)
+	// log.Warnf("jackoelv:sched:canHandleRequest:maxNeedMem:%d", maxNeedMem)
+	// log.Warnf("jackoelv:sched:canHandleRequest:res.MemSwap+res.MemPhysical:%d", res.MemSwap+res.MemPhysical)
 	if maxNeedMem > res.MemSwap+res.MemPhysical {
 		log.Debugf("sched: not scheduling on worker %d; not enough virtual memory - need: %dM, have %dM", wid, maxNeedMem/mib, (res.MemSwap+res.MemPhysical)/mib)
 		return false
 	}
-
+	// log.Warnf("jackoelv:sched:canHandleRequest: active.cpuUse :%d", active.cpuUse)
+	// log.Warnf("jackoelv:sched:canHandleRequest: uint64(needRes.Threads) :%d", uint64(needRes.Threads))
+	// log.Warnf("jackoelv:sched:canHandleRequest: res.CPUs :%d", res.CPUs)
 	if needRes.MultiThread() {
 		if active.cpuUse > 0 {
 			log.Debugf("sched: not scheduling on worker %d; multicore process needs %d threads, %d in use, target %d", wid, res.CPUs, active.cpuUse, res.CPUs)
@@ -428,7 +445,8 @@ func canHandleRequest(needRes Resources, spt abi.RegisteredSealProof, wid Worker
 			return false
 		}
 	}
-
+	// log.Warnf("jackoelv:sched:canHandleRequest: len(res.GPUs)  :%d", len(res.GPUs))
+	// log.Warnf("jackoelv:sched:canHandleRequest: active.gpuUsed  :%d", active.gpuUsed)
 	if len(res.GPUs) > 0 && needRes.CanGPU {
 		if active.gpuUsed {
 			log.Debugf("sched: not scheduling on worker %d; GPU in use", wid)

@@ -62,6 +62,7 @@ type localWorkerPathProvider struct {
 
 func (l *localWorkerPathProvider) AcquireSector(ctx context.Context, sector abi.SectorID, existing stores.SectorFileType, allocate stores.SectorFileType, sealing stores.PathType) (stores.SectorPaths, func(), error) {
 	paths, storageIDs, err := l.w.storage.AcquireSector(ctx, sector, l.w.scfg.SealProofType, existing, allocate, sealing, l.op)
+	// log.Debugf("jackoelv:localworker: acquired sector")
 	if err != nil {
 		return stores.SectorPaths{}, nil, err
 	}
@@ -116,6 +117,7 @@ func (l *LocalWorker) Fetch(ctx context.Context, sector abi.SectorID, fileType s
 
 func (l *LocalWorker) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, pieces []abi.PieceInfo) (out storage2.PreCommit1Out, err error) {
 	{
+		log.Debugf("jackoelv:localworker: SealPreCommit1")
 		// cleanup previous failed attempts if they exist
 		if err := l.storage.Remove(ctx, sector, stores.FTSealed, true); err != nil {
 			return nil, xerrors.Errorf("cleaning up sealed data: %w", err)
@@ -135,6 +137,7 @@ func (l *LocalWorker) SealPreCommit1(ctx context.Context, sector abi.SectorID, t
 }
 
 func (l *LocalWorker) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase1Out storage2.PreCommit1Out) (cids storage2.SectorCids, err error) {
+	log.Debugf("jackoelv:localworker: SealPreCommit2")
 	sb, err := l.sb()
 	if err != nil {
 		return storage2.SectorCids{}, err
@@ -144,6 +147,7 @@ func (l *LocalWorker) SealPreCommit2(ctx context.Context, sector abi.SectorID, p
 }
 
 func (l *LocalWorker) SealCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, seed abi.InteractiveSealRandomness, pieces []abi.PieceInfo, cids storage2.SectorCids) (output storage2.Commit1Out, err error) {
+	log.Debugf("jackoelv:localworker: SealCommit1")
 	sb, err := l.sb()
 	if err != nil {
 		return nil, err
@@ -153,6 +157,7 @@ func (l *LocalWorker) SealCommit1(ctx context.Context, sector abi.SectorID, tick
 }
 
 func (l *LocalWorker) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Out storage2.Commit1Out) (proof storage2.Proof, err error) {
+	log.Debugf("jackoelv:localworker: SealCommit2")
 	sb, err := l.sb()
 	if err != nil {
 		return nil, err

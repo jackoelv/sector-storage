@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"unsafe"
 
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
@@ -253,11 +254,12 @@ func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector abi.Sect
 }
 
 func (m *Manager) NewSector(ctx context.Context, sector abi.SectorID) error {
-	log.Warnf("stub NewSector")
+	log.Warnf("jackoelv:manager:stub NewSector")
 	return nil
 }
 
 func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPieces []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, r io.Reader) (abi.PieceInfo, error) {
+	log.Warnf("jackoelv:manager:AddPiece")
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -283,6 +285,10 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 			return err
 		}
 		out = p
+		wInfo, _ := w.Info(ctx)
+		log.Warnf("jackoelv:manager:AddPiece:w info: %s", wInfo.Hostname)
+		log.Warnf("jackoelv:manager:AddPiece:sizeof out: %d", unsafe.Sizeof(out))
+
 		return nil
 	})
 
@@ -310,6 +316,9 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 			return err
 		}
 		out = p
+		wInfo, _ := w.Info(ctx)
+		log.Warnf("jackoelv:manager:SealPreCommit1:w info: %s", wInfo.Hostname)
+		log.Warnf("jackoelv:manager:sizeof SealPreCommit1: %d", unsafe.Sizeof(out))
 		return nil
 	})
 
@@ -317,6 +326,7 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 }
 
 func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase1Out storage.PreCommit1Out) (out storage.SectorCids, err error) {
+	log.Warnf("jackoelv:manager:SealPreCommit2")
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -335,12 +345,16 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 			return err
 		}
 		out = p
+		wInfo, _ := w.Info(ctx)
+		log.Warnf("jackoelv:manager:SealPreCommit2:w info: %s", wInfo.Hostname)
+		log.Warnf("jackoelv:manager:sizeof SealPreCommit2: %d", unsafe.Sizeof(out))
 		return nil
 	})
 	return out, err
 }
 
 func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, seed abi.InteractiveSealRandomness, pieces []abi.PieceInfo, cids storage.SectorCids) (out storage.Commit1Out, err error) {
+	log.Warnf("jackoelv:manager:SealCommit1")
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -362,12 +376,16 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 			return err
 		}
 		out = p
+		wInfo, _ := w.Info(ctx)
+		log.Warnf("jackoelv:manager:SealCommit1:w info: %s", wInfo.Hostname)
+		log.Warnf("jackoelv:manager:sizeof SealCommit1: %d", unsafe.Sizeof(out))
 		return nil
 	})
 	return out, err
 }
 
 func (m *Manager) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Out storage.Commit1Out) (out storage.Proof, err error) {
+	log.Warnf("jackoelv:manager:SealCommit2")
 	selector := newTaskSelector()
 
 	err = m.sched.Schedule(ctx, sector, sealtasks.TTCommit2, selector, schedNop, func(ctx context.Context, w Worker) error {
@@ -376,6 +394,9 @@ func (m *Manager) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Ou
 			return err
 		}
 		out = p
+		wInfo, _ := w.Info(ctx)
+		log.Warnf("jackoelv:manager:SealCommit2:w info: %s", wInfo.Hostname)
+		log.Warnf("jackoelv:manager:sizeof SealCommit2: %d", unsafe.Sizeof(out))
 		return nil
 	})
 
@@ -410,6 +431,8 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 	err = m.sched.Schedule(ctx, sector, sealtasks.TTFinalize, selector,
 		schedFetch(sector, stores.FTCache|stores.FTSealed|unsealed, stores.PathSealing, stores.AcquireMove),
 		func(ctx context.Context, w Worker) error {
+			wInfo, _ := w.Info(ctx)
+			log.Warnf("jackoelv:manager:FinalizeSector:w info: %s", wInfo.Hostname)
 			return w.FinalizeSector(ctx, sector, keepUnsealed)
 		})
 	if err != nil {

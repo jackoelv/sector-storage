@@ -52,6 +52,7 @@ func (sb *Sealer) NewSector(ctx context.Context, sector abi.SectorID) error {
 }
 
 func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPieceSizes []abi.UnpaddedPieceSize, pieceSize abi.UnpaddedPieceSize, file storage.Data) (abi.PieceInfo, error) {
+	log.Errorf("jackoelv: sealer_cgo:AddPiece")
 	var offset abi.UnpaddedPieceSize
 	for _, size := range existingPieceSizes {
 		offset += size
@@ -81,6 +82,7 @@ func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 
 	var stagedPath stores.SectorPaths
 	if len(existingPieceSizes) == 0 {
+		log.Errorf("jackoelv: sealer_cgo:AddPiece:AcquireSector")
 		stagedPath, done, err = sb.sectors.AcquireSector(ctx, sector, 0, stores.FTUnsealed, true)
 		if err != nil {
 			return abi.PieceInfo{}, xerrors.Errorf("acquire unsealed sector: %w", err)

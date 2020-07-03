@@ -51,6 +51,7 @@ func NewRemote(local *Local, index SectorIndex, auth http.Header) *Remote {
 }
 
 func (r *Remote) AcquireSector(ctx context.Context, s abi.SectorID, spt abi.RegisteredSealProof, existing SectorFileType, allocate SectorFileType, pathType PathType, op AcquireMode) (SectorPaths, SectorPaths, error) {
+	log.Warnf("jackoelv:remote:AcquireSector:begin")
 	if existing|allocate != existing^allocate {
 		return SectorPaths{}, SectorPaths{}, xerrors.New("can't both find and allocate a sector")
 	}
@@ -81,7 +82,7 @@ func (r *Remote) AcquireSector(ctx context.Context, s abi.SectorID, spt abi.Regi
 		delete(r.fetching, s)
 		r.fetchLk.Unlock()
 	}()
-
+	log.Warnf("jackoelv:remote:AcquireSector:here")
 	paths, stores, err := r.local.AcquireSector(ctx, s, spt, existing, allocate, pathType, op)
 	if err != nil {
 		return SectorPaths{}, SectorPaths{}, xerrors.Errorf("local acquire error: %w", err)
@@ -120,6 +121,7 @@ func (r *Remote) AcquireSector(ctx context.Context, s abi.SectorID, spt abi.Regi
 }
 
 func (r *Remote) acquireFromRemote(ctx context.Context, s abi.SectorID, spt abi.RegisteredSealProof, fileType SectorFileType, pathType PathType, op AcquireMode) (string, ID, string, error) {
+	log.Infof("jackoelv:remote:acquireFromRemote")
 	si, err := r.index.StorageFindSector(ctx, s, fileType, false)
 	if err != nil {
 		return "", "", "", err
@@ -132,7 +134,7 @@ func (r *Remote) acquireFromRemote(ctx context.Context, s abi.SectorID, spt abi.
 	sort.Slice(si, func(i, j int) bool {
 		return si[i].Weight < si[j].Weight
 	})
-
+	log.Warnf("jackoelv:remote:acquireFromRemote:AcquireSector")
 	apaths, ids, err := r.local.AcquireSector(ctx, s, spt, FTNone, fileType, pathType, op)
 	if err != nil {
 		return "", "", "", xerrors.Errorf("allocate local sector for fetching: %w", err)
@@ -162,7 +164,7 @@ func (r *Remote) acquireFromRemote(ctx context.Context, s abi.SectorID, spt abi.
 }
 
 func (r *Remote) fetch(ctx context.Context, url, outname string) error {
-	log.Infof("Fetch %s -> %s", url, outname)
+	log.Infof("jackoelv:remote:fetch:Fetch %s -> %s", url, outname)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -212,6 +214,7 @@ func (r *Remote) fetch(ctx context.Context, url, outname string) error {
 
 func (r *Remote) MoveStorage(ctx context.Context, s abi.SectorID, spt abi.RegisteredSealProof, types SectorFileType) error {
 	// Make sure we have the data local
+	log.Warnf("jackoelv:remote:MoveStorage:AcquireSector")
 	_, _, err := r.AcquireSector(ctx, s, spt, types, FTNone, PathStorage, AcquireMove)
 	if err != nil {
 		return xerrors.Errorf("acquire src storage (remote): %w", err)

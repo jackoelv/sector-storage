@@ -17,6 +17,7 @@ type readonlyProvider struct {
 }
 
 func (l *readonlyProvider) AcquireSector(ctx context.Context, id abi.SectorID, existing stores.SectorFileType, allocate stores.SectorFileType, sealing stores.PathType) (stores.SectorPaths, func(), error) {
+	// xerrors.Errorf("jackoelv:roprov:AcquireSector")
 	if allocate != stores.FTNone {
 		return stores.SectorPaths{}, nil, xerrors.New("read-only storage")
 	}
