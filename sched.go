@@ -44,12 +44,24 @@ type WorkerSelector interface {
 	Cmp(ctx context.Context, task sealtasks.TaskType, a, b *workerHandle) (bool, error) // true if a is preferred over b
 }
 
+//Add By Jackoelv begin
+type workerState struct {
+	taskType sealtasks.TaskType
+	pending  int
+}
+
+//End
 type scheduler struct {
 	spt abi.RegisteredSealProof
 
 	workersLk  sync.Mutex
 	nextWorker WorkerID
 	workers    map[WorkerID]*workerHandle
+
+	workerSectorID    map[WorkerID]abi.SectorID //add by jackoelv
+	workerTaskType    map[WorkerID]workerState  //add by jackoelv
+	workerBySectorID  map[abi.SectorID]WorkerID //add by jackoelv
+	workerPre1Pending map[WorkerID]int          //add by jackoelv
 
 	newWorkers chan *workerHandle
 
@@ -69,6 +81,11 @@ func newScheduler(spt abi.RegisteredSealProof) *scheduler {
 
 		nextWorker: 0,
 		workers:    map[WorkerID]*workerHandle{},
+
+		workerSectorID:    map[WorkerID]abi.SectorID{}, //add by jackoelv
+		workerTaskType:    map[WorkerID]workerState{},  //add by jackoelv
+		workerBySectorID:  map[abi.SectorID]WorkerID{}, //add by jackoelv
+		workerPre1Pending: map[WorkerID]int{},          //add by jackoelv
 
 		newWorkers: make(chan *workerHandle),
 
@@ -239,12 +256,40 @@ func (sh *scheduler) maybeSchedRequest(req *workerRequest) (bool, error) {
 
 	needRes := ResourceTable[req.taskType][sh.spt]
 
+	//add by jackoelv begin
+	foundTheWorker := false
+	theLastWorkerID := WorkerID(0)
+
+	if req.taskType != sealtasks.TTAddPiece {
+		for wid, _ := range sh.workers {
+			if sh.workerSectorID[wid] == req.sector {
+				if req.taskType == sealtasks.TTPreCommit1 {
+					if sh.workerTaskType[wid].pending < 3 {
+						theLastWorkerID = wid
+						foundTheWorker = true
+						log.Warnf("jackoelv:sched:maybeSchedRequest:foundTheWorker:TTPreCommit1:req.taskType: %s, wid: %s", req.taskType, wid)
+					}
+				} else {
+					theLastWorkerID = wid
+					foundTheWorker = true
+					log.Warnf("jackoelv:sched:maybeSchedRequest:foundTheWorker:!!!NOT!!! TTPreCommit1:req.taskType: %s, wid: %s", req.taskType, wid)
+
+				}
+			}
+		}
+	}
+	if foundTheWorker {
+		log.Warnf("jackoelv:sched:maybeSchedRequest:foundTheWorker:sh.assignWorker:req.taskType: %s, wid: %s", req.taskType, theLastWorkerID)
+		return true, sh.assignWorker(theLastWorkerID, sh.workers[theLastWorkerID], req)
+	}
+	//add by jack end
+
 	for wid, worker := range sh.workers {
 		rpcCtx, cancel := context.WithTimeout(req.ctx, selectorTimeout)
 		// log.Warnf("jackoelv:sched:maybeSchedRequest:req.taskType: %s, wid: %s, ok: %s",req.taskType,wid,ok)
 		ok, err := req.sel.Ok(rpcCtx, req.taskType, sh.spt, worker)
-		
-		log.Warnf("jackoelv:sched:maybeSchedRequest:req.taskType: %s, wid: %s, ok: %s",req.taskType,wid,ok)
+
+		log.Warnf("jackoelv:sched:maybeSchedRequest:Orginal:req.taskType: %s, wid: %s, ok: %s", req.taskType, wid, ok)
 		cancel()
 
 		if err != nil {
@@ -257,7 +302,7 @@ func (sh *scheduler) maybeSchedRequest(req *workerRequest) (bool, error) {
 		tried++
 
 		if !canHandleRequest(needRes, sh.spt, wid, worker.info.Resources, worker.preparing) {
-			log.Warnf("jackoelv:sched:maybeSchedRequest:canHandleRequest,wid: %d",wid)
+			log.Warnf("jackoelv:sched:maybeSchedRequest:Orginal:canHandleRequest,wid: %d", wid)
 			continue
 		}
 		acceptable = append(acceptable, wid)
@@ -283,7 +328,7 @@ func (sh *scheduler) maybeSchedRequest(req *workerRequest) (bool, error) {
 				return false, xerrors.Errorf("error(s) selecting best worker: %w", serr)
 			}
 		}
-		log.Warnf("jackoelv:sched:maybeSchedRequest:return assignWorker true,acceptable[0]: %d; sector: %d",acceptable[0],req.sector)
+		log.Warnf("jackoelv:sched:maybeSchedRequest:Orginal:return assignWorker true,acceptable[0]: %d; sector: %d", acceptable[0], req.sector)
 		return true, sh.assignWorker(acceptable[0], sh.workers[acceptable[0]], req)
 	}
 
@@ -295,7 +340,7 @@ func (sh *scheduler) maybeSchedRequest(req *workerRequest) (bool, error) {
 }
 
 func (sh *scheduler) assignWorker(wid WorkerID, w *workerHandle, req *workerRequest) error {
-	log.Warnf("jackoelv:sched:assignWorker,WorkerID:%d ; taskType: %s; sector: %d",wid,req.taskType,req.sector)
+	log.Warnf("jackoelv:sched:assignWorker,WorkerID:%d ; taskType: %s; sector: %d", wid, req.taskType, req.sector)
 	needRes := ResourceTable[req.taskType][sh.spt]
 
 	w.preparing.add(w.info.Resources, needRes)
@@ -335,6 +380,24 @@ func (sh *scheduler) assignWorker(wid WorkerID, w *workerHandle, req *workerRequ
 			}
 
 			err = req.work(req.ctx, w.w)
+
+			//Add by jackoelv begin
+			log.Warnf("jackoelv:sched:assignWorker:initialize the last worker")
+
+			tmpWorkerSectorID := sh.workerSectorID[wid]
+			tmpWorkerSectorID = req.sector
+			sh.workerSectorID[wid] = tmpWorkerSectorID
+
+			tmpWorkerTaskType := sh.workerTaskType[wid]
+			tmpWorkerTaskType.taskType = req.taskType
+			tmpWorkerTaskType.pending = sh.workerTaskType[wid].pending + 1
+			sh.workerTaskType[wid] = tmpWorkerTaskType
+
+			tmpWorkerID := sh.workerBySectorID[req.sector]
+			tmpWorkerID = wid
+			sh.workerBySectorID[req.sector] = tmpWorkerID
+
+			//add by jackoelv end
 
 			select {
 			case req.ret <- workerResponse{err: err}:

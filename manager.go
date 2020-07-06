@@ -281,6 +281,7 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 	var out abi.PieceInfo
 	err = m.sched.Schedule(ctx, sector, sealtasks.TTAddPiece, selector, schedNop, func(ctx context.Context, w Worker) error {
 		p, err := w.AddPiece(ctx, sector, existingPieces, sz, r)
+
 		if err != nil {
 			return err
 		}
