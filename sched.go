@@ -44,13 +44,8 @@ type WorkerSelector interface {
 	Cmp(ctx context.Context, task sealtasks.TaskType, a, b *workerHandle) (bool, error) // true if a is preferred over b
 }
 
-//Add By Jackoelv begin
-type workerState struct {
-	taskType sealtasks.TaskType
-	pending  int
-}
+type sectorsNum int
 
-//End
 type scheduler struct {
 	spt abi.RegisteredSealProof
 
@@ -58,10 +53,8 @@ type scheduler struct {
 	nextWorker WorkerID
 	workers    map[WorkerID]*workerHandle
 
-	workerSectorID    map[WorkerID]abi.SectorID //add by jackoelv
-	workerTaskType    map[WorkerID]workerState  //add by jackoelv
-	workerBySectorID  map[abi.SectorID]WorkerID //add by jackoelv
-	workerPre1Pending map[WorkerID]int          //add by jackoelv
+	workerSectorNum  map[WorkerID]sectorsNum   //add by jackoelv
+	workerBySectorID map[abi.SectorID]WorkerID //add by jackoelv
 
 	newWorkers chan *workerHandle
 
@@ -82,10 +75,8 @@ func newScheduler(spt abi.RegisteredSealProof) *scheduler {
 		nextWorker: 0,
 		workers:    map[WorkerID]*workerHandle{},
 
-		workerSectorID:    map[WorkerID]abi.SectorID{}, //add by jackoelv
-		workerTaskType:    map[WorkerID]workerState{},  //add by jackoelv
-		workerBySectorID:  map[abi.SectorID]WorkerID{}, //add by jackoelv
-		workerPre1Pending: map[WorkerID]int{},          //add by jackoelv
+		workerSectorNum:  map[WorkerID]sectorsNum{},   //add by jackoelv
+		workerBySectorID: map[abi.SectorID]WorkerID{}, //add by jackoelv
 
 		newWorkers: make(chan *workerHandle),
 
@@ -257,30 +248,17 @@ func (sh *scheduler) maybeSchedRequest(req *workerRequest) (bool, error) {
 	needRes := ResourceTable[req.taskType][sh.spt]
 
 	//add by jackoelv begin
-	foundTheWorker := false
-	theLastWorkerID := WorkerID(0)
 
-	if req.taskType != sealtasks.TTAddPiece {
-		for wid, _ := range sh.workers {
-			if sh.workerSectorID[wid] == req.sector {
-				if req.taskType == sealtasks.TTPreCommit1 {
-					if sh.workerTaskType[wid].pending < 3 {
-						theLastWorkerID = wid
-						foundTheWorker = true
-						log.Warnf("jackoelv:sched:maybeSchedRequest:foundTheWorker:TTPreCommit1:req.taskType: %s, wid: %s", req.taskType, wid)
-					}
-				} else {
-					theLastWorkerID = wid
-					foundTheWorker = true
-					log.Warnf("jackoelv:sched:maybeSchedRequest:foundTheWorker:!!!NOT!!! TTPreCommit1:req.taskType: %s, wid: %s", req.taskType, wid)
-
-				}
-			}
+	if req.taskType != sealtasks.TTAddPiece && req.taskType != sealtasks.TTFetch && req.taskType != sealtasks.TTUnseal && req.taskType != sealtasks.TTReadUnsealed {
+		wid := sh.workerBySectorID[req.sector]
+		if (wid > 0) && (sh.workerSectorNum[wid-1] <= 3) {
+			log.Warnf("jackoelv:maybeSchedRequest:!!!NOT!!!:sectorNumber: %s,taskType: %s, wid: %d, totalSectorsNum:%s", req.sector.Number, req.taskType, wid-1, sh.workerSectorNum[wid-1])
+			return true, sh.assignWorker(wid-1, sh.workers[wid-1], req)
 		}
 	}
-	if foundTheWorker {
-		log.Warnf("jackoelv:sched:maybeSchedRequest:foundTheWorker:sh.assignWorker:req.taskType: %s, wid: %s", req.taskType, theLastWorkerID)
-		return true, sh.assignWorker(theLastWorkerID, sh.workers[theLastWorkerID], req)
+	if req.taskType == sealtasks.TTAddPiece {
+		log.Warnf("jackoelv:maybeSchedRequest:TTAddPiece:sectorNumber: %s,taskType: %s, wid: 0", req.sector.Number, req.taskType)
+		return true, sh.assignWorker(0, sh.workers[0], req)
 	}
 	//add by jack end
 
@@ -382,20 +360,19 @@ func (sh *scheduler) assignWorker(wid WorkerID, w *workerHandle, req *workerRequ
 			err = req.work(req.ctx, w.w)
 
 			//Add by jackoelv begin
-			log.Warnf("jackoelv:sched:assignWorker:initialize the last worker")
+			log.Warnf("jackoelv:sched:assignWorker:modify state for the last worker")
 
-			tmpWorkerSectorID := sh.workerSectorID[wid]
-			tmpWorkerSectorID = req.sector
-			sh.workerSectorID[wid] = tmpWorkerSectorID
-
-			tmpWorkerTaskType := sh.workerTaskType[wid]
-			tmpWorkerTaskType.taskType = req.taskType
-			tmpWorkerTaskType.pending = sh.workerTaskType[wid].pending + 1
-			sh.workerTaskType[wid] = tmpWorkerTaskType
-
-			tmpWorkerID := sh.workerBySectorID[req.sector]
-			tmpWorkerID = wid
-			sh.workerBySectorID[req.sector] = tmpWorkerID
+			switch req.taskType {
+			case sealtasks.TTPreCommit1:
+				log.Warnf("jackoelv:sched:assignWorker:initialize the last worker: wid: %d, sectorNumber: %s", wid, req.sector.Number)
+				tmpWorkerID := sh.workerBySectorID[req.sector]
+				tmpWorkerID = wid + 1
+				sh.workerBySectorID[req.sector] = tmpWorkerID
+				sh.workerSectorNum[wid]++
+			case sealtasks.TTCommit2:
+				sh.workerSectorNum[wid]--
+			}
+			log.Warnf("jackoelv:worker:%d in sector:%s,SectorNumTotal:%d", wid, req.sector.Number, sh.workerSectorNum[wid])
 
 			//add by jackoelv end
 

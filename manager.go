@@ -281,13 +281,12 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 	var out abi.PieceInfo
 	err = m.sched.Schedule(ctx, sector, sealtasks.TTAddPiece, selector, schedNop, func(ctx context.Context, w Worker) error {
 		p, err := w.AddPiece(ctx, sector, existingPieces, sz, r)
-
 		if err != nil {
 			return err
 		}
 		out = p
 		wInfo, _ := w.Info(ctx)
-		log.Warnf("jackoelv:manager:AddPiece:w info: %s", wInfo.Hostname)
+		log.Warnf("jackoelv:manager:AddPiece:w info: %s,sector.Number is: %s", wInfo.Hostname, sector.Number)
 		log.Warnf("jackoelv:manager:AddPiece:sizeof out: %d", unsafe.Sizeof(out))
 
 		return nil
@@ -313,12 +312,13 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 
 	err = m.sched.Schedule(ctx, sector, sealtasks.TTPreCommit1, selector, schedFetch(sector, stores.FTUnsealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
 		p, err := w.SealPreCommit1(ctx, sector, ticket, pieces)
+
 		if err != nil {
 			return err
 		}
 		out = p
 		wInfo, _ := w.Info(ctx)
-		log.Warnf("jackoelv:manager:SealPreCommit1:w info: %s", wInfo.Hostname)
+		log.Warnf("jackoelv:manager:SealPreCommit1:w info: %s, SectorNum is:%s", wInfo.Hostname, sector.Number)
 		log.Warnf("jackoelv:manager:sizeof SealPreCommit1: %d", unsafe.Sizeof(out))
 		return nil
 	})
@@ -347,7 +347,7 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 		}
 		out = p
 		wInfo, _ := w.Info(ctx)
-		log.Warnf("jackoelv:manager:SealPreCommit2:w info: %s", wInfo.Hostname)
+		log.Warnf("jackoelv:manager:SealPreCommit2:w info: %s,sector.Number is: %s", wInfo.Hostname, sector.Number)
 		log.Warnf("jackoelv:manager:sizeof SealPreCommit2: %d", unsafe.Sizeof(out))
 		return nil
 	})
@@ -378,7 +378,7 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 		}
 		out = p
 		wInfo, _ := w.Info(ctx)
-		log.Warnf("jackoelv:manager:SealCommit1:w info: %s", wInfo.Hostname)
+		log.Warnf("jackoelv:manager:SealCommit1:w info: %s,sector.Number is: %s", wInfo.Hostname, sector.Number)
 		log.Warnf("jackoelv:manager:sizeof SealCommit1: %d", unsafe.Sizeof(out))
 		return nil
 	})
@@ -396,7 +396,7 @@ func (m *Manager) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Ou
 		}
 		out = p
 		wInfo, _ := w.Info(ctx)
-		log.Warnf("jackoelv:manager:SealCommit2:w info: %s", wInfo.Hostname)
+		log.Warnf("jackoelv:manager:SealCommit2:w info: %s,sector.Number is:%s", wInfo.Hostname, sector.Number)
 		log.Warnf("jackoelv:manager:sizeof SealCommit2: %d", unsafe.Sizeof(out))
 		return nil
 	})
@@ -433,7 +433,7 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 		schedFetch(sector, stores.FTCache|stores.FTSealed|unsealed, stores.PathSealing, stores.AcquireMove),
 		func(ctx context.Context, w Worker) error {
 			wInfo, _ := w.Info(ctx)
-			log.Warnf("jackoelv:manager:FinalizeSector:w info: %s", wInfo.Hostname)
+			log.Warnf("jackoelv:manager:FinalizeSector:w info: %s,sector.Number is %s", wInfo.Hostname, sector.Number)
 			return w.FinalizeSector(ctx, sector, keepUnsealed)
 		})
 	if err != nil {
