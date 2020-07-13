@@ -19,6 +19,7 @@ import (
 	"github.com/filecoin-project/sector-storage/sealtasks"
 	"github.com/filecoin-project/sector-storage/stores"
 	"github.com/filecoin-project/sector-storage/storiface"
+	nr "github.com/filecoin-project/storage-fsm/lib/nullreader"
 )
 
 var pathTypes = []stores.SectorFileType{stores.FTUnsealed, stores.FTSealed, stores.FTCache}
@@ -89,6 +90,7 @@ func (l *LocalWorker) sb() (ffiwrapper.Storage, error) {
 }
 
 func (l *LocalWorker) NewSector(ctx context.Context, sector abi.SectorID) error {
+	log.Warnf("jackoelvAddpiecetest:sector-storage/localworker.go NewSector")
 	sb, err := l.sb()
 	if err != nil {
 		return err
@@ -96,8 +98,20 @@ func (l *LocalWorker) NewSector(ctx context.Context, sector abi.SectorID) error 
 
 	return sb.NewSector(ctx, sector)
 }
+func (l *LocalWorker) RemoteAddPiece(ctx context.Context, sector abi.SectorID, epcs []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize) (abi.PieceInfo, error){
+	log.Warnf("jackoelvAddpiecetest:sector-storage/localworker.go RemoteAddPiece")
+	// size := abi.PaddedPieceSize(sb.ssize).Unpadded()
+	// r := rand.New(rand.NewSource(100 + int64(sector.Number)))
+	r := io.LimitReader(&nr.Reader{}, int64(sz))
+	sb, err := l.sb()
+	if err != nil {
+		return abi.PieceInfo{}, err
+	}
 
+	return sb.AddPiece(ctx, sector, epcs, sz, r)
+}
 func (l *LocalWorker) AddPiece(ctx context.Context, sector abi.SectorID, epcs []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, r io.Reader) (abi.PieceInfo, error) {
+	log.Warnf("jackoelvAddpiecetest:sector-storage/localworker.go AddPiece")
 	sb, err := l.sb()
 	if err != nil {
 		return abi.PieceInfo{}, err
@@ -116,6 +130,7 @@ func (l *LocalWorker) Fetch(ctx context.Context, sector abi.SectorID, fileType s
 }
 
 func (l *LocalWorker) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, pieces []abi.PieceInfo) (out storage2.PreCommit1Out, err error) {
+	log.Warnf("jackoelvAddpiecetest:sector-storage/localworker.go SealPreCommit1")
 	{
 		log.Debugf("jackoelv:localworker: SealPreCommit1")
 		// cleanup previous failed attempts if they exist

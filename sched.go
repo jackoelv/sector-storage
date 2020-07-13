@@ -44,7 +44,15 @@ type WorkerSelector interface {
 	Cmp(ctx context.Context, task sealtasks.TaskType, a, b *workerHandle) (bool, error) // true if a is preferred over b
 }
 
+<<<<<<< Updated upstream
 type sectorsNum int
+=======
+//add by jackoelv
+type workerState struct {
+	sector   abi.SectorID
+	taskType sealtasks.TaskType
+}
+>>>>>>> Stashed changes
 
 type scheduler struct {
 	spt abi.RegisteredSealProof
@@ -53,8 +61,13 @@ type scheduler struct {
 	nextWorker WorkerID
 	workers    map[WorkerID]*workerHandle
 
+<<<<<<< Updated upstream
 	workerSectorNum  map[WorkerID]sectorsNum   //add by jackoelv
 	workerBySectorID map[abi.SectorID]WorkerID //add by jackoelv
+=======
+	workerParallelSectors map[WorkerID]int           //add by jackoelv
+	workerDoing           map[WorkerID][]workerState //add by jackoelv
+>>>>>>> Stashed changes
 
 	newWorkers chan *workerHandle
 
@@ -75,8 +88,13 @@ func newScheduler(spt abi.RegisteredSealProof) *scheduler {
 		nextWorker: 0,
 		workers:    map[WorkerID]*workerHandle{},
 
+<<<<<<< Updated upstream
 		workerSectorNum:  map[WorkerID]sectorsNum{},   //add by jackoelv
 		workerBySectorID: map[abi.SectorID]WorkerID{}, //add by jackoelv
+=======
+		workerParallelSectors: map[WorkerID]int{},
+		workerDoing:           map[WorkerID][]workerState{},
+>>>>>>> Stashed changes
 
 		newWorkers: make(chan *workerHandle),
 
@@ -268,6 +286,7 @@ func (sh *scheduler) maybeSchedRequest(req *workerRequest) (bool, error) {
 		ok, err := req.sel.Ok(rpcCtx, req.taskType, sh.spt, worker)
 
 		log.Warnf("jackoelv:sched:maybeSchedRequest:Orginal:req.taskType: %s, wid: %s, ok: %s", req.taskType, wid, ok)
+=======
 		cancel()
 
 		if err != nil {
@@ -358,6 +377,16 @@ func (sh *scheduler) assignWorker(wid WorkerID, w *workerHandle, req *workerRequ
 			}
 
 			err = req.work(req.ctx, w.w)
+			// if req.taskType == sealtasks.TTPreCommit1 {
+			// 	err = sh.changeWorkState(wid, req.sector, req.taskType)
+			// }
+			if req.taskType == sealtasks.TTFetch {
+				err = sh.removeWorkState(wid, req.sector)
+			} else {
+				err = sh.changeWorkState(wid, req.sector, req.taskType)
+			}
+
+			//when first pre1 coming,then assign the sector to the worker
 
 			//Add by jackoelv begin
 			log.Warnf("jackoelv:sched:assignWorker:modify state for the last worker")
@@ -398,9 +427,52 @@ func (sh *scheduler) assignWorker(wid WorkerID, w *workerHandle, req *workerRequ
 	return nil
 }
 
+<<<<<<< Updated upstream
 func (a *activeResources) withResources(spt abi.RegisteredSealProof, id WorkerID, wr storiface.WorkerResources, r Resources, locker sync.Locker, cb func() error) error {
 	// log.Warnf("jackoelv:sched:withResources")
 	for !canHandleRequest(r, spt, id, wr, a) {
+=======
+func (sh *scheduler) changeWorkState(wid WorkerID, sector abi.SectorID, taskType sealtasks.TaskType) error {
+	found := false
+	wStates := sh.workerDoing[wid]
+	log.Warnf("jackoelv:changeWorkState begin,wid:%s,wStates:%s", wid,wStates)
+	for id, tmpWs := range wStates {
+		if tmpWs.sector == sector {
+			tmpWs.taskType = taskType
+			wStates[id] = tmpWs
+			sh.workerDoing[wid] = wStates
+			found = true
+			break
+		}
+	}
+	if !found {
+		var ws workerState
+		ws.sector = sector
+		ws.taskType = taskType
+		wStates = append(wStates, ws)
+		sh.workerDoing[wid] = wStates
+	}
+	log.Warnf("jackoelv:changeWorkState end,wid:%s,wStates:%s", wid,wStates)
+	return nil
+}
+
+func (sh *scheduler) removeWorkState(wid WorkerID, sector abi.SectorID) error {
+	wStates := sh.workerDoing[wid]
+	log.Warnf("jackoelv:removeWorkState begin,wid:%s,wStates:%s", wid,wStates)
+	for id, tmpWs := range wStates {
+		if tmpWs.sector == sector {
+			wStates = append(wStates[:id], wStates[id+1:]...)
+			sh.workerDoing[wid] = wStates
+			break
+		}
+	}
+	log.Warnf("jackoelv:removeWorkState end:wid:%s,wStates:%s", wid,wStates)
+	return nil
+}
+
+func (a *activeResources) withResources(id WorkerID, wr storiface.WorkerResources, r Resources, locker sync.Locker, cb func() error) error {
+	for !canHandleRequest(r, id, wr, a) {
+>>>>>>> Stashed changes
 		if a.cond == nil {
 			a.cond = sync.NewCond(locker)
 		}

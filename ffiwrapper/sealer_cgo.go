@@ -173,7 +173,8 @@ func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 	if err != nil {
 		return abi.PieceInfo{}, err
 	}
-
+	
+	log.Warnf("jackoelvAddpiecetest:ffiwrapper:sealer_cgo:AddPiece:return")
 	return abi.PieceInfo{
 		Size:     pieceSize.Padded(),
 		PieceCID: commcid.PieceCommitmentV1ToCID(commp),
@@ -397,6 +398,7 @@ func (sb *Sealer) ReadPiece(ctx context.Context, writer io.Writer, sector abi.Se
 }
 
 func (sb *Sealer) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, pieces []abi.PieceInfo) (out storage.PreCommit1Out, err error) {
+	log.Warnf("jackoelvAddpiecetest:ffiwrapper/sealer_cgo:SealPreCommit1")
 	paths, done, err := sb.sectors.AcquireSector(ctx, sector, stores.FTUnsealed, stores.FTSealed|stores.FTCache, true)
 	if err != nil {
 		return nil, xerrors.Errorf("acquiring sector paths: %w", err)
