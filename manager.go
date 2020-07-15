@@ -52,6 +52,7 @@ type Worker interface {
 type SectorManager interface {
 	SectorSize() abi.SectorSize
 
+	DealAddPiece(ctx context.Context, sector abi.SectorID, existingPieces []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, r io.Reader) (abi.PieceInfo, error)
 	ReadPiece(context.Context, io.Writer, abi.SectorID, storiface.UnpaddedByteIndex, abi.UnpaddedPieceSize, abi.SealRandomness, cid.Cid) error
 
 	ffiwrapper.StorageSealer
@@ -97,6 +98,7 @@ func New(ctx context.Context, ls stores.LocalStorage, si stores.SectorIndex, cfg
 	}
 
 	stor := stores.NewRemote(lstor, si, http.Header(sa))
+	log.Warnf("jackoelvAcquireSectorTest:manager:New: local:%s,remote:%s", lstor, stor)
 
 	m := &Manager{
 		scfg: cfg,
@@ -255,6 +257,27 @@ func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector abi.Sect
 
 func (m *Manager) NewSector(ctx context.Context, sector abi.SectorID) error {
 	log.Warnf("jackoelv:manager:stub NewSector")
+	// log.Warnf("jackoelvAcquireSectorTest:manager:add stores here")
+	// ctx, cancel := context.WithCancel(ctx)
+	// defer cancel()
+	//
+	// if err := m.index.StorageLock(ctx, sector, stores.FTNone, stores.FTUnsealed); err != nil {
+	// 	return err
+	// }
+	//
+	// var selector WorkerSelector
+	// var err error
+	// selector, err = newAllocSelector(ctx, m.index, stores.FTUnsealed, stores.PathSealing)
+	// if err != nil {
+	// 	return err
+	// }
+	// err = m.sched.Schedule(ctx, sector, sealtasks.TTDealAddPiece, selector, schedNop, func(ctx context.Context, w Worker) error {
+	// 	err := w.NewSector(ctx, sector)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	return nil
+	// })
 	return nil
 }
 
@@ -288,6 +311,43 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 		wInfo, _ := w.Info(ctx)
 		log.Warnf("jackoelv:manager:AddPiece:w info: %s,sector.Number is: %s", wInfo.Hostname, sector.Number)
 		log.Warnf("jackoelv:manager:AddPiece:sizeof out: %d", unsafe.Sizeof(out))
+
+		return nil
+	})
+
+	return out, err
+}
+
+func (m *Manager) DealAddPiece(ctx context.Context, sector abi.SectorID, existingPieces []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, r io.Reader) (abi.PieceInfo, error) {
+	log.Warnf("jackoelv:manager:DealAddPiece")
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	if err := m.index.StorageLock(ctx, sector, stores.FTNone, stores.FTUnsealed); err != nil {
+		return abi.PieceInfo{}, xerrors.Errorf("acquiring sector lock: %w", err)
+	}
+
+	var selector WorkerSelector
+	var err error
+	if len(existingPieces) == 0 { // new
+		selector, err = newAllocSelector(ctx, m.index, stores.FTUnsealed, stores.PathSealing)
+	} else { // use existing
+		selector, err = newExistingSelector(ctx, m.index, sector, stores.FTUnsealed, false)
+	}
+	if err != nil {
+		return abi.PieceInfo{}, xerrors.Errorf("creating path selector: %w", err)
+	}
+
+	var out abi.PieceInfo
+	err = m.sched.Schedule(ctx, sector, sealtasks.TTDealAddPiece, selector, schedNop, func(ctx context.Context, w Worker) error {
+		p, err := w.AddPiece(ctx, sector, existingPieces, sz, r)
+		if err != nil {
+			return err
+		}
+		out = p
+		wInfo, _ := w.Info(ctx)
+		log.Warnf("jackoelv:manager:DealAddPiece:w info: %s,sector.Number is: %s", wInfo.Hostname, sector.Number)
+		log.Warnf("jackoelv:manager:DealAddPiece:sizeof out: %d", unsafe.Sizeof(out))
 
 		return nil
 	})
@@ -452,9 +512,13 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 		}
 	}
 
+	log.Infof("jackoelvAcquireSectorTest:manager:MoveStorage:before m.sched.Schedule")
+	log.Infof("jackoelvAcquireSectorTest:manager:MoveStorage:before m.sched.Schedule:stores.PathStorage: %s; sector: %s", stores.PathStorage, sector)
+
 	err = m.sched.Schedule(ctx, sector, sealtasks.TTFetch, fetchSel,
 		schedFetch(sector, stores.FTCache|stores.FTSealed|moveUnsealed, stores.PathStorage, stores.AcquireMove),
 		func(ctx context.Context, w Worker) error {
+			log.Infof("jackoelvAcquireSectorTest:manager:MoveStorage:before w.MoveStorage,sector: %s", sector)
 			return w.MoveStorage(ctx, sector)
 		})
 	if err != nil {

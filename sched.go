@@ -243,6 +243,14 @@ func (sh *scheduler) maybeSchedRequest(req *workerRequest) (bool, error) {
 	sh.workersLk.Lock()
 	defer sh.workersLk.Unlock()
 
+	// if DealAddPiece or NewSector directy assign to work 0
+	if req.taskType == sealtasks.TTDealAddPiece {
+		return true, sh.assignWorker(0, sh.workers[0], req)
+	}
+	if req.taskType == sealtasks.TTAddPiece {
+		return true, sh.assignWorker(0, sh.workers[0], req)
+	}
+
 	tried := 0
 	var acceptable []WorkerID
 
@@ -382,7 +390,7 @@ func (sh *scheduler) assignWorker(wid WorkerID, w *workerHandle, req *workerRequ
 func (sh *scheduler) changeWorkState(wid WorkerID, sector abi.SectorID, taskType sealtasks.TaskType) error {
 	found := false
 	wStates := sh.workerDoing[wid]
-	log.Warnf("jackoelv:changeWorkState begin,wid:%s,wStates:%s", wid,wStates)
+	log.Warnf("jackoelv:changeWorkState begin,wid:%s,wStates:%s", wid, wStates)
 	for id, tmpWs := range wStates {
 		if tmpWs.sector == sector {
 			tmpWs.taskType = taskType
@@ -399,13 +407,13 @@ func (sh *scheduler) changeWorkState(wid WorkerID, sector abi.SectorID, taskType
 		wStates = append(wStates, ws)
 		sh.workerDoing[wid] = wStates
 	}
-	log.Warnf("jackoelv:changeWorkState end,wid:%s,wStates:%s", wid,wStates)
+	log.Warnf("jackoelv:changeWorkState end,wid:%s,wStates:%s", wid, wStates)
 	return nil
 }
 
 func (sh *scheduler) removeWorkState(wid WorkerID, sector abi.SectorID) error {
 	wStates := sh.workerDoing[wid]
-	log.Warnf("jackoelv:removeWorkState begin,wid:%s,wStates:%s", wid,wStates)
+	log.Warnf("jackoelv:removeWorkState begin,wid:%s,wStates:%s", wid, wStates)
 	for id, tmpWs := range wStates {
 		if tmpWs.sector == sector {
 			wStates = append(wStates[:id], wStates[id+1:]...)
@@ -413,7 +421,7 @@ func (sh *scheduler) removeWorkState(wid WorkerID, sector abi.SectorID) error {
 			break
 		}
 	}
-	log.Warnf("jackoelv:removeWorkState end:wid:%s,wStates:%s", wid,wStates)
+	log.Warnf("jackoelv:removeWorkState end:wid:%s,wStates:%s", wid, wStates)
 	return nil
 }
 

@@ -63,12 +63,11 @@ type localWorkerPathProvider struct {
 
 func (l *localWorkerPathProvider) AcquireSector(ctx context.Context, sector abi.SectorID, existing stores.SectorFileType, allocate stores.SectorFileType, sealing stores.PathType) (stores.SectorPaths, func(), error) {
 	paths, storageIDs, err := l.w.storage.AcquireSector(ctx, sector, l.w.scfg.SealProofType, existing, allocate, sealing, l.op)
-	// log.Debugf("jackoelv:localworker: acquired sector")
+	log.Debugf("jackoelvAcquireSectorTest:acquired sector %d (e:%d; a:%d): %v", sector, existing, allocate, paths)
 	if err != nil {
 		return stores.SectorPaths{}, nil, err
 	}
 
-	log.Debugf("acquired sector %d (e:%d; a:%d): %v", sector, existing, allocate, paths)
 
 	return paths, func() {
 		for _, fileType := range pathTypes {
@@ -98,7 +97,7 @@ func (l *LocalWorker) NewSector(ctx context.Context, sector abi.SectorID) error 
 
 	return sb.NewSector(ctx, sector)
 }
-func (l *LocalWorker) RemoteAddPiece(ctx context.Context, sector abi.SectorID, epcs []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize) (abi.PieceInfo, error){
+func (l *LocalWorker) RemoteAddPiece(ctx context.Context, sector abi.SectorID, epcs []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize) (abi.PieceInfo, error) {
 	log.Warnf("jackoelvAddpiecetest:sector-storage/localworker.go RemoteAddPiece")
 	// size := abi.PaddedPieceSize(sb.ssize).Unpadded()
 	// r := rand.New(rand.NewSource(100 + int64(sector.Number)))
@@ -219,6 +218,7 @@ func (l *LocalWorker) Remove(ctx context.Context, sector abi.SectorID) error {
 }
 
 func (l *LocalWorker) MoveStorage(ctx context.Context, sector abi.SectorID) error {
+	log.Debugf("jackoelvAcquireSectorTest:(l *LocalWorker) MoveStorage,sector:%s",sector)
 	if err := l.storage.MoveStorage(ctx, sector, l.scfg.SealProofType, stores.FTSealed|stores.FTCache); err != nil {
 		return xerrors.Errorf("moving sealed data to storage: %w", err)
 	}
