@@ -198,7 +198,6 @@ func (st *Local) reportHealth(ctx context.Context) {
 }
 
 func (st *Local) AcquireSector(ctx context.Context, sid abi.SectorID, spt abi.RegisteredSealProof, existing SectorFileType, allocate SectorFileType, pathType PathType, op AcquireMode) (SectorPaths, SectorPaths, error) {
-	log.Warnf("jackoelvAcquireSectorTest:local:AcquireSector")
 	if existing|allocate != existing^allocate {
 		return SectorPaths{}, SectorPaths{}, xerrors.New("can't both find and allocate a sector")
 	}
@@ -238,9 +237,6 @@ func (st *Local) AcquireSector(ctx context.Context, sid abi.SectorID, spt abi.Re
 			break
 		}
 	}
-	
-	log.Warnf("jackoelvAcquireSectorTest:local:AcquireSector,PathTypes:%s",PathTypes)
-
 
 	for _, fileType := range PathTypes {
 		if fileType&allocate == 0 {
@@ -280,7 +276,7 @@ func (st *Local) AcquireSector(ctx context.Context, sid abi.SectorID, spt abi.Re
 		}
 
 		if best == "" {
-			return SectorPaths{}, SectorPaths{}, xerrors.Errorf("jackoelvAcquireSectorTest:couldn't find a suitable path for a sector")
+			return SectorPaths{}, SectorPaths{}, xerrors.Errorf("couldn't find a suitable path for a sector")
 		}
 
 		SetPathByType(&out, fileType, best)
@@ -403,12 +399,10 @@ func (st *Local) removeSector(ctx context.Context, sid abi.SectorID, typ SectorF
 
 func (st *Local) MoveStorage(ctx context.Context, s abi.SectorID, spt abi.RegisteredSealProof, types SectorFileType) error {
 	dest, destIds, err := st.AcquireSector(ctx, s, spt, FTNone, types, false, AcquireMove)
-	log.Debugf("jackoelvAcquireSectorTest:local:MoveStorage:AcquireSector,dest:%s,destIds:%s",dest,destIds)
 	if err != nil {
 		return xerrors.Errorf("acquire dest storage: %w", err)
 	}
 	src, srcIds, err := st.AcquireSector(ctx, s, spt, types, FTNone, false, AcquireMove)
-	log.Debugf("jackoelvAcquireSectorTest:local:MoveStorage:AcquireSector,src:%s,srcIds:%s",src,srcIds)
 	if err != nil {
 		return xerrors.Errorf("acquire src storage: %w", err)
 	}

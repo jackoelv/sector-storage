@@ -41,7 +41,6 @@ func (r *Remote) RemoveCopies(ctx context.Context, s abi.SectorID, types SectorF
 }
 
 func NewRemote(local *Local, index SectorIndex, auth http.Header) *Remote {
-	log.Warnf("jackoelvAcquireSectorTest:remote:NewRemote:local:%s,index:%d,auth:%s", local, index, auth)
 	return &Remote{
 		local: local,
 		index: index,
@@ -52,7 +51,6 @@ func NewRemote(local *Local, index SectorIndex, auth http.Header) *Remote {
 }
 
 func (r *Remote) AcquireSector(ctx context.Context, s abi.SectorID, spt abi.RegisteredSealProof, existing SectorFileType, allocate SectorFileType, pathType PathType, op AcquireMode) (SectorPaths, SectorPaths, error) {
-	log.Warnf("jackoelvAcquireSectorTest:remote:AcquireSector:begin，existing:%s,allocate:%s", existing, allocate)
 	if existing|allocate != existing^allocate {
 		return SectorPaths{}, SectorPaths{}, xerrors.New("can't both find and allocate a sector")
 	}
@@ -85,26 +83,20 @@ func (r *Remote) AcquireSector(ctx context.Context, s abi.SectorID, spt abi.Regi
 	}()
 
 	paths, stores, err := r.local.AcquireSector(ctx, s, spt, existing, allocate, pathType, op)
-	log.Warnf("jackoelvAcquireSectorTest:remote:AcquireSector:r.local.AcquireSector,paths:%s,stores:%s", paths, stores)
 	if err != nil {
 		return SectorPaths{}, SectorPaths{}, xerrors.Errorf("local acquire error: %w", err)
 	}
 	
-	log.Warnf("jackoelvAcquireSectorTest:remote:AcquireSector:r.local.AcquireSector,PathTypes:%s", PathTypes)
 
 
 	for _, fileType := range PathTypes {
-		log.Warnf("jackoelvAcquireSectorTest:remote:AcquireSector:r.local.AcquireSector,PathTypes,for fileType:%s", fileType)
 		if fileType&existing == 0 {
 			continue
 		}
-		log.Warnf("jackoelvAcquireSectorTest:remote:AcquireSector:r.local.AcquireSector,PathTypes,for PathByType(paths, fileType):%s", PathByType(paths, fileType))
 		if PathByType(paths, fileType) != "" {
 			continue
 		}
-		log.Warnf("jackoelvAcquireSectorTest:remote:AcquireSector:r.local.AcquireSector,fileType, %s; pathType, %s; op, %s", fileType, pathType, op)
 		ap, storageID, url, err := r.acquireFromRemote(ctx, s, spt, fileType, pathType, op)
-		log.Warnf("jackoelvAcquireSectorTest:r.acquireFromRemote,ap, %s; storageID, %s; url, %s", ap, storageID, url)
 		if err != nil {
 			return SectorPaths{}, SectorPaths{}, err
 		}
@@ -123,13 +115,11 @@ func (r *Remote) AcquireSector(ctx context.Context, s abi.SectorID, spt abi.Regi
 			}
 		}
 	}
-	log.Warnf("jackoelvAcquireSectorTest:remote:AcquireSector:in the end,paths:%s,stores:%s", paths, stores)
 
 	return paths, stores, nil
 }
 
 func (r *Remote) acquireFromRemote(ctx context.Context, s abi.SectorID, spt abi.RegisteredSealProof, fileType SectorFileType, pathType PathType, op AcquireMode) (string, ID, string, error) {
-	log.Infof("jackoelvAcquireSectorTest:remote:acquireFromRemote")
 	si, err := r.index.StorageFindSector(ctx, s, fileType, false)
 	if err != nil {
 		return "", "", "", err
@@ -142,7 +132,6 @@ func (r *Remote) acquireFromRemote(ctx context.Context, s abi.SectorID, spt abi.
 	sort.Slice(si, func(i, j int) bool {
 		return si[i].Weight < si[j].Weight
 	})
-	log.Warnf("jackoelvAcquireSectorTest:remote:acquireFromRemote:AcquireSector")
 	apaths, ids, err := r.local.AcquireSector(ctx, s, spt, FTNone, fileType, pathType, op)
 	if err != nil {
 		return "", "", "", xerrors.Errorf("allocate local sector for fetching: %w", err)
@@ -172,7 +161,6 @@ func (r *Remote) acquireFromRemote(ctx context.Context, s abi.SectorID, spt abi.
 }
 
 func (r *Remote) fetch(ctx context.Context, url, outname string) error {
-	log.Infof("jackoelvAcquireSectorTest:remote:fetch:Fetch %s -> %s", url, outname)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -222,7 +210,6 @@ func (r *Remote) fetch(ctx context.Context, url, outname string) error {
 
 func (r *Remote) MoveStorage(ctx context.Context, s abi.SectorID, spt abi.RegisteredSealProof, types SectorFileType) error {
 	// Make sure we have the data local
-	log.Warnf("jackoelvAcquireSectorTest:remote:MoveStorage:AcquireSector:PathStorage:%s, AcquireMove:%s",PathStorage, AcquireMove)
 	_, _, err := r.AcquireSector(ctx, s, spt, types, FTNone, PathStorage, AcquireMove)
 	if err != nil {
 		return xerrors.Errorf("acquire src storage (remote): %w", err)

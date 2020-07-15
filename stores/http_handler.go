@@ -52,7 +52,6 @@ func (handler *FetchHandler) remoteStatFs(w http.ResponseWriter, r *http.Request
 }
 
 func (handler *FetchHandler) remoteGetSector(w http.ResponseWriter, r *http.Request) {
-	log.Infof("jackoelv:http_handler:remoteGetSector:SERVE GET %s", r.URL)
 	vars := mux.Vars(r)
 
 	id, err := ParseSectorID(vars["id"])
@@ -116,7 +115,6 @@ func (handler *FetchHandler) remoteGetSector(w http.ResponseWriter, r *http.Requ
 }
 
 func (handler *FetchHandler) remoteDeleteSector(w http.ResponseWriter, r *http.Request) {
-	log.Infof("jackoelv:http_handler:remoteDeleteSector:SERVE DELETE %s", r.URL)
 	vars := mux.Vars(r)
 
 	id, err := ParseSectorID(vars["id"])

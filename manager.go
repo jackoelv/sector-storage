@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"unsafe"
 
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
@@ -98,7 +97,6 @@ func New(ctx context.Context, ls stores.LocalStorage, si stores.SectorIndex, cfg
 	}
 
 	stor := stores.NewRemote(lstor, si, http.Header(sa))
-	log.Warnf("jackoelvAcquireSectorTest:manager:New: local:%s,remote:%s", lstor, stor)
 
 	m := &Manager{
 		scfg: cfg,
@@ -257,27 +255,6 @@ func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector abi.Sect
 
 func (m *Manager) NewSector(ctx context.Context, sector abi.SectorID) error {
 	log.Warnf("jackoelv:manager:stub NewSector")
-	// log.Warnf("jackoelvAcquireSectorTest:manager:add stores here")
-	// ctx, cancel := context.WithCancel(ctx)
-	// defer cancel()
-	//
-	// if err := m.index.StorageLock(ctx, sector, stores.FTNone, stores.FTUnsealed); err != nil {
-	// 	return err
-	// }
-	//
-	// var selector WorkerSelector
-	// var err error
-	// selector, err = newAllocSelector(ctx, m.index, stores.FTUnsealed, stores.PathSealing)
-	// if err != nil {
-	// 	return err
-	// }
-	// err = m.sched.Schedule(ctx, sector, sealtasks.TTDealAddPiece, selector, schedNop, func(ctx context.Context, w Worker) error {
-	// 	err := w.NewSector(ctx, sector)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	return nil
-	// })
 	return nil
 }
 
@@ -308,10 +285,6 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 			return err
 		}
 		out = p
-		wInfo, _ := w.Info(ctx)
-		log.Warnf("jackoelv:manager:AddPiece:w info: %s,sector.Number is: %s", wInfo.Hostname, sector.Number)
-		log.Warnf("jackoelv:manager:AddPiece:sizeof out: %d", unsafe.Sizeof(out))
-
 		return nil
 	})
 
@@ -345,10 +318,6 @@ func (m *Manager) DealAddPiece(ctx context.Context, sector abi.SectorID, existin
 			return err
 		}
 		out = p
-		wInfo, _ := w.Info(ctx)
-		log.Warnf("jackoelv:manager:DealAddPiece:w info: %s,sector.Number is: %s", wInfo.Hostname, sector.Number)
-		log.Warnf("jackoelv:manager:DealAddPiece:sizeof out: %d", unsafe.Sizeof(out))
-
 		return nil
 	})
 
@@ -377,9 +346,6 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 			return err
 		}
 		out = p
-		wInfo, _ := w.Info(ctx)
-		log.Warnf("jackoelv:manager:SealPreCommit1:w info: %s, SectorNum is:%s", wInfo.Hostname, sector.Number)
-		log.Warnf("jackoelv:manager:sizeof SealPreCommit1: %d", unsafe.Sizeof(out))
 		return nil
 	})
 
@@ -406,9 +372,6 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 			return err
 		}
 		out = p
-		wInfo, _ := w.Info(ctx)
-		log.Warnf("jackoelv:manager:SealPreCommit2:w info: %s,sector.Number is: %s", wInfo.Hostname, sector.Number)
-		log.Warnf("jackoelv:manager:sizeof SealPreCommit2: %d", unsafe.Sizeof(out))
 		return nil
 	})
 	return out, err
@@ -437,9 +400,6 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 			return err
 		}
 		out = p
-		wInfo, _ := w.Info(ctx)
-		log.Warnf("jackoelv:manager:SealCommit1:w info: %s,sector.Number is: %s", wInfo.Hostname, sector.Number)
-		log.Warnf("jackoelv:manager:sizeof SealCommit1: %d", unsafe.Sizeof(out))
 		return nil
 	})
 	return out, err
@@ -455,9 +415,6 @@ func (m *Manager) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Ou
 			return err
 		}
 		out = p
-		wInfo, _ := w.Info(ctx)
-		log.Warnf("jackoelv:manager:SealCommit2:w info: %s,sector.Number is:%s", wInfo.Hostname, sector.Number)
-		log.Warnf("jackoelv:manager:sizeof SealCommit2: %d", unsafe.Sizeof(out))
 		return nil
 	})
 
@@ -492,8 +449,6 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 	err = m.sched.Schedule(ctx, sector, sealtasks.TTFinalize, selector,
 		schedFetch(sector, stores.FTCache|stores.FTSealed|unsealed, stores.PathSealing, stores.AcquireMove),
 		func(ctx context.Context, w Worker) error {
-			wInfo, _ := w.Info(ctx)
-			log.Warnf("jackoelv:manager:FinalizeSector:w info: %s,sector.Number is %s", wInfo.Hostname, sector.Number)
 			return w.FinalizeSector(ctx, sector, keepUnsealed)
 		})
 	if err != nil {
@@ -512,13 +467,9 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 		}
 	}
 
-	log.Infof("jackoelvAcquireSectorTest:manager:MoveStorage:before m.sched.Schedule")
-	log.Infof("jackoelvAcquireSectorTest:manager:MoveStorage:before m.sched.Schedule:stores.PathStorage: %s; sector: %s", stores.PathStorage, sector)
-
 	err = m.sched.Schedule(ctx, sector, sealtasks.TTFetch, fetchSel,
 		schedFetch(sector, stores.FTCache|stores.FTSealed|moveUnsealed, stores.PathStorage, stores.AcquireMove),
 		func(ctx context.Context, w Worker) error {
-			log.Infof("jackoelvAcquireSectorTest:manager:MoveStorage:before w.MoveStorage,sector: %s", sector)
 			return w.MoveStorage(ctx, sector)
 		})
 	if err != nil {

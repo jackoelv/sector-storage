@@ -48,16 +48,14 @@ func New(sectors SectorProvider, cfg *Config) (*Sealer, error) {
 func (sb *Sealer) NewSector(ctx context.Context, sector abi.SectorID) error {
 	// TODO: Allocate the sector here instead of in addpiece
 	// Add the store here try it by jackoelv
-	log.Warnf("jackoelvAcquireSectorTest:sealer_cgo:add stores here")
-	_, _, err := sb.sectors.AcquireSector(ctx, sector, 0, stores.FTUnsealed, false)
-	if err != nil {
-		return err
-	}
+	// _, _, err := sb.sectors.AcquireSector(ctx, sector, 0, stores.FTUnsealed, false)
+	// if err != nil {
+	// 	return err
+	// }
 	return nil
 }
 
 func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPieceSizes []abi.UnpaddedPieceSize, pieceSize abi.UnpaddedPieceSize, file storage.Data) (abi.PieceInfo, error) {
-	log.Errorf("jackoelv: sealer_cgo:AddPiece")
 	var offset abi.UnpaddedPieceSize
 	for _, size := range existingPieceSizes {
 		offset += size
@@ -88,7 +86,6 @@ func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 	var stagedPath stores.SectorPaths
 	if len(existingPieceSizes) == 0 {
 		stagedPath, done, err = sb.sectors.AcquireSector(ctx, sector, 0, stores.FTUnsealed, true)
-		log.Errorf("jackoelvAcquireSectorTest: sealer_cgo:AddPiece:AcquireSector")
 		if err != nil {
 			return abi.PieceInfo{}, xerrors.Errorf("acquire unsealed sector: %w", err)
 		}
@@ -179,7 +176,6 @@ func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 		return abi.PieceInfo{}, err
 	}
 
-	log.Warnf("jackoelvAddpiecetest:ffiwrapper:sealer_cgo:AddPiece:return")
 	return abi.PieceInfo{
 		Size:     pieceSize.Padded(),
 		PieceCID: commcid.PieceCommitmentV1ToCID(commp),

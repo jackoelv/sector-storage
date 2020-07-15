@@ -21,7 +21,6 @@ func newTaskSelector() *taskSelector {
 
 func (s *taskSelector) Ok(ctx context.Context, task sealtasks.TaskType, spt abi.RegisteredSealProof, whnd *workerHandle) (bool, error) {
 	tasks, err := whnd.w.TaskTypes(ctx)
-	log.Warnf("jackoelv:selector_task:taskSelector:Ok:task: %s ", task)
 	if err != nil {
 		return false, xerrors.Errorf("getting supported worker task types: %w", err)
 	}

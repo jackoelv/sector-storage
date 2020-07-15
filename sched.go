@@ -247,9 +247,9 @@ func (sh *scheduler) maybeSchedRequest(req *workerRequest) (bool, error) {
 	if req.taskType == sealtasks.TTDealAddPiece {
 		return true, sh.assignWorker(0, sh.workers[0], req)
 	}
-	if req.taskType == sealtasks.TTAddPiece {
-		return true, sh.assignWorker(0, sh.workers[0], req)
-	}
+	// if req.taskType == sealtasks.TTAddPiece {
+	// 	return true, sh.assignWorker(0, sh.workers[0], req)
+	// }
 
 	tried := 0
 	var acceptable []WorkerID
@@ -258,12 +258,14 @@ func (sh *scheduler) maybeSchedRequest(req *workerRequest) (bool, error) {
 
 	for wid, worker := range sh.workers {
 		// Test if precommit 1 to otherworker what will happen?
-		if wid != 0 {
-			return true, sh.assignWorker(wid, sh.workers[wid], req)
+		if req.taskType == sealtasks.TTAddPiece {
+			if wid != 0 {
+				return true, sh.assignWorker(wid, sh.workers[wid], req)
+			}
 		}
+
 		rpcCtx, cancel := context.WithTimeout(req.ctx, selectorTimeout)
 		ok, err := req.sel.Ok(rpcCtx, req.taskType, sh.spt, worker)
-		log.Warnf("jackoelvAddpiecetest:sched:WorkerID:%d,req.sel.Ok:%s,req.taskType:%s", wid, ok, req.taskType)
 		cancel()
 
 		if err != nil {
@@ -283,8 +285,6 @@ func (sh *scheduler) maybeSchedRequest(req *workerRequest) (bool, error) {
 	}
 
 	if len(acceptable) > 0 {
-		log.Warnf("jackoelvAddpiecetest:sched:len(acceptable):%d,req.taskType:%s", len(acceptable), req.taskType)
-
 		{
 			var serr error
 

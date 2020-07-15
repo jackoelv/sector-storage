@@ -63,7 +63,6 @@ type localWorkerPathProvider struct {
 
 func (l *localWorkerPathProvider) AcquireSector(ctx context.Context, sector abi.SectorID, existing stores.SectorFileType, allocate stores.SectorFileType, sealing stores.PathType) (stores.SectorPaths, func(), error) {
 	paths, storageIDs, err := l.w.storage.AcquireSector(ctx, sector, l.w.scfg.SealProofType, existing, allocate, sealing, l.op)
-	log.Debugf("jackoelvAcquireSectorTest:acquired sector %d (e:%d; a:%d): %v", sector, existing, allocate, paths)
 	if err != nil {
 		return stores.SectorPaths{}, nil, err
 	}
@@ -89,7 +88,6 @@ func (l *LocalWorker) sb() (ffiwrapper.Storage, error) {
 }
 
 func (l *LocalWorker) NewSector(ctx context.Context, sector abi.SectorID) error {
-	log.Warnf("jackoelvAddpiecetest:sector-storage/localworker.go NewSector")
 	sb, err := l.sb()
 	if err != nil {
 		return err
@@ -131,7 +129,6 @@ func (l *LocalWorker) Fetch(ctx context.Context, sector abi.SectorID, fileType s
 func (l *LocalWorker) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, pieces []abi.PieceInfo) (out storage2.PreCommit1Out, err error) {
 	log.Warnf("jackoelvAddpiecetest:sector-storage/localworker.go SealPreCommit1")
 	{
-		log.Debugf("jackoelv:localworker: SealPreCommit1")
 		// cleanup previous failed attempts if they exist
 		if err := l.storage.Remove(ctx, sector, stores.FTSealed, true); err != nil {
 			return nil, xerrors.Errorf("cleaning up sealed data: %w", err)
@@ -218,7 +215,6 @@ func (l *LocalWorker) Remove(ctx context.Context, sector abi.SectorID) error {
 }
 
 func (l *LocalWorker) MoveStorage(ctx context.Context, sector abi.SectorID) error {
-	log.Debugf("jackoelvAcquireSectorTest:(l *LocalWorker) MoveStorage,sector:%s",sector)
 	if err := l.storage.MoveStorage(ctx, sector, l.scfg.SealProofType, stores.FTSealed|stores.FTCache); err != nil {
 		return xerrors.Errorf("moving sealed data to storage: %w", err)
 	}
