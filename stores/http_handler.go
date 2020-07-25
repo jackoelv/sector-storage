@@ -52,6 +52,7 @@ func (handler *FetchHandler) remoteStatFs(w http.ResponseWriter, r *http.Request
 }
 
 func (handler *FetchHandler) remoteGetSector(w http.ResponseWriter, r *http.Request) {
+	log.Infof("SERVE GET %s", r.URL)
 	vars := mux.Vars(r)
 
 	id, err := ParseSectorID(vars["id"])
@@ -71,13 +72,14 @@ func (handler *FetchHandler) remoteGetSector(w http.ResponseWriter, r *http.Requ
 	// The caller has a lock on this sector already, no need to get one here
 
 	// passing 0 spt because we don't allocate anything
-	log.Error("jackoelv:http_handler:AcquireSector")
-	paths, _, err := handler.Local.AcquireSector(r.Context(), id, 0, ft, FTNone, false, AcquireMove)
+	paths, _, err := handler.Local.AcquireSector(r.Context(), id, 0, ft, FTNone, PathStorage, AcquireMove)
 	if err != nil {
 		log.Error("%+v", err)
 		w.WriteHeader(500)
 		return
 	}
+
+	// TODO: reserve local storage here
 
 	path := PathByType(paths, ft)
 	if path == "" {
@@ -115,6 +117,7 @@ func (handler *FetchHandler) remoteGetSector(w http.ResponseWriter, r *http.Requ
 }
 
 func (handler *FetchHandler) remoteDeleteSector(w http.ResponseWriter, r *http.Request) {
+	log.Infof("SERVE DELETE %s", r.URL)
 	vars := mux.Vars(r)
 
 	id, err := ParseSectorID(vars["id"])

@@ -3,6 +3,7 @@ package sectorstorage
 import (
 	"context"
 	"errors"
+	"github.com/filecoin-project/sector-storage/fsutil"
 	"io"
 	"net/http"
 
@@ -166,7 +167,10 @@ func (m *Manager) AddWorker(ctx context.Context, w Worker) error {
 	}
 
 	m.sched.newWorkers <- &workerHandle{
-		w:         w,
+		w: w,
+		wt: &workTracker{
+			running: map[uint64]storiface.WorkerJob{},
+		},
 		info:      info,
 		preparing: &activeResources{},
 		active:    &activeResources{},
@@ -208,7 +212,7 @@ func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector abi.Sect
 
 	var selector WorkerSelector
 	if len(best) == 0 { // new
-		selector, err = newAllocSelector(ctx, m.index, stores.FTUnsealed, stores.PathSealing)
+		selector = newAllocSelector(ctx, m.index, stores.FTUnsealed, stores.PathSealing)
 	} else { // append to existing
 		selector, err = newExistingSelector(ctx, m.index, sector, stores.FTUnsealed, false)
 	}
@@ -219,12 +223,12 @@ func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector abi.Sect
 	// TODO: Optimization: don't send unseal to a worker if the requested range is already unsealed
 
 	unsealFetch := func(ctx context.Context, worker Worker) error {
-		if err := worker.Fetch(ctx, sector, stores.FTSealed|stores.FTCache, true, stores.AcquireCopy); err != nil {
+		if err := worker.Fetch(ctx, sector, stores.FTSealed|stores.FTCache, stores.PathSealing, stores.AcquireCopy); err != nil {
 			return xerrors.Errorf("copy sealed/cache sector data: %w", err)
 		}
 
 		if len(best) > 0 {
-			if err := worker.Fetch(ctx, sector, stores.FTUnsealed, true, stores.AcquireMove); err != nil {
+			if err := worker.Fetch(ctx, sector, stores.FTUnsealed, stores.PathSealing, stores.AcquireMove); err != nil {
 				return xerrors.Errorf("copy unsealed sector data: %w", err)
 			}
 		}
@@ -270,7 +274,7 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 	var selector WorkerSelector
 	var err error
 	if len(existingPieces) == 0 { // new
-		selector, err = newAllocSelector(ctx, m.index, stores.FTUnsealed, stores.PathSealing)
+		selector = newAllocSelector(ctx, m.index, stores.FTUnsealed, stores.PathSealing)
 	} else { // use existing
 		selector, err = newExistingSelector(ctx, m.index, sector, stores.FTUnsealed, false)
 	}
@@ -334,10 +338,7 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 
 	// TODO: also consider where the unsealed data sits
 
-	selector, err := newAllocSelector(ctx, m.index, stores.FTCache|stores.FTSealed, stores.PathSealing)
-	if err != nil {
-		return nil, xerrors.Errorf("creating path selector: %w", err)
-	}
+	selector := newAllocSelector(ctx, m.index, stores.FTCache|stores.FTSealed, stores.PathSealing)
 
 	err = m.sched.Schedule(ctx, sector, sealtasks.TTPreCommit1, selector, schedFetch(sector, stores.FTUnsealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
 		p, err := w.SealPreCommit1(ctx, sector, ticket, pieces)
@@ -455,11 +456,7 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 		return err
 	}
 
-	fetchSel, err := newAllocSelector(ctx, m.index, stores.FTCache|stores.FTSealed, stores.PathStorage)
-	if err != nil {
-		return xerrors.Errorf("creating fetchSel: %w", err)
-	}
-
+	fetchSel := newAllocSelector(ctx, m.index, stores.FTCache|stores.FTSealed, stores.PathStorage)
 	moveUnsealed := unsealed
 	{
 		if len(keepUnsealed) == 0 {
@@ -480,7 +477,8 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 }
 
 func (m *Manager) ReleaseUnsealed(ctx context.Context, sector abi.SectorID, safeToFree []storage.Range) error {
-	return xerrors.Errorf("implement me")
+	log.Warnw("ReleaseUnsealed todo")
+	return nil
 }
 
 func (m *Manager) Remove(ctx context.Context, sector abi.SectorID) error {
@@ -529,12 +527,12 @@ func (m *Manager) StorageLocal(ctx context.Context) (map[stores.ID]string, error
 	return out, nil
 }
 
-func (m *Manager) FsStat(ctx context.Context, id stores.ID) (stores.FsStat, error) {
+func (m *Manager) FsStat(ctx context.Context, id stores.ID) (fsutil.FsStat, error) {
 	return m.storage.FsStat(ctx, id)
 }
 
-func (m *Manager) Close() error {
-	return m.sched.Close()
+func (m *Manager) Close(ctx context.Context) error {
+	return m.sched.Close(ctx)
 }
 
 var _ SectorManager = &Manager{}
