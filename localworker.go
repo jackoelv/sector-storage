@@ -19,7 +19,6 @@ import (
 	"github.com/filecoin-project/sector-storage/sealtasks"
 	"github.com/filecoin-project/sector-storage/stores"
 	"github.com/filecoin-project/sector-storage/storiface"
-	nr "github.com/filecoin-project/storage-fsm/lib/nullreader"
 )
 
 var pathTypes = []stores.SectorFileType{stores.FTUnsealed, stores.FTSealed, stores.FTCache}
@@ -62,13 +61,22 @@ type localWorkerPathProvider struct {
 }
 
 func (l *localWorkerPathProvider) AcquireSector(ctx context.Context, sector abi.SectorID, existing stores.SectorFileType, allocate stores.SectorFileType, sealing stores.PathType) (stores.SectorPaths, func(), error) {
+
 	paths, storageIDs, err := l.w.storage.AcquireSector(ctx, sector, l.w.scfg.SealProofType, existing, allocate, sealing, l.op)
 	if err != nil {
 		return stores.SectorPaths{}, nil, err
 	}
 
+	releaseStorage, err := l.w.localStore.Reserve(ctx, sector, l.w.scfg.SealProofType, allocate, storageIDs, stores.FSOverheadSeal)
+	if err != nil {
+		return stores.SectorPaths{}, nil, xerrors.Errorf("reserving storage space: %w", err)
+	}
+
+	log.Debugf("acquired sector %d (e:%d; a:%d): %v", sector, existing, allocate, paths)
 
 	return paths, func() {
+		releaseStorage()
+
 		for _, fileType := range pathTypes {
 			if fileType&allocate == 0 {
 				continue
@@ -95,20 +103,8 @@ func (l *LocalWorker) NewSector(ctx context.Context, sector abi.SectorID) error 
 
 	return sb.NewSector(ctx, sector)
 }
-func (l *LocalWorker) RemoteAddPiece(ctx context.Context, sector abi.SectorID, epcs []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize) (abi.PieceInfo, error) {
-	log.Warnf("jackoelvAddpiecetest:sector-storage/localworker.go RemoteAddPiece")
-	// size := abi.PaddedPieceSize(sb.ssize).Unpadded()
-	// r := rand.New(rand.NewSource(100 + int64(sector.Number)))
-	r := io.LimitReader(&nr.Reader{}, int64(sz))
-	sb, err := l.sb()
-	if err != nil {
-		return abi.PieceInfo{}, err
-	}
 
-	return sb.AddPiece(ctx, sector, epcs, sz, r)
-}
 func (l *LocalWorker) AddPiece(ctx context.Context, sector abi.SectorID, epcs []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, r io.Reader) (abi.PieceInfo, error) {
-	log.Warnf("jackoelvAddpiecetest:sector-storage/localworker.go AddPiece")
 	sb, err := l.sb()
 	if err != nil {
 		return abi.PieceInfo{}, err
@@ -127,7 +123,6 @@ func (l *LocalWorker) Fetch(ctx context.Context, sector abi.SectorID, fileType s
 }
 
 func (l *LocalWorker) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, pieces []abi.PieceInfo) (out storage2.PreCommit1Out, err error) {
-	log.Warnf("jackoelvAddpiecetest:sector-storage/localworker.go SealPreCommit1")
 	{
 		// cleanup previous failed attempts if they exist
 		if err := l.storage.Remove(ctx, sector, stores.FTSealed, true); err != nil {
@@ -148,7 +143,6 @@ func (l *LocalWorker) SealPreCommit1(ctx context.Context, sector abi.SectorID, t
 }
 
 func (l *LocalWorker) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase1Out storage2.PreCommit1Out) (cids storage2.SectorCids, err error) {
-	log.Debugf("jackoelv:localworker: SealPreCommit2")
 	sb, err := l.sb()
 	if err != nil {
 		return storage2.SectorCids{}, err
@@ -158,7 +152,6 @@ func (l *LocalWorker) SealPreCommit2(ctx context.Context, sector abi.SectorID, p
 }
 
 func (l *LocalWorker) SealCommit1(ctx context.Context, sector abi.SectorID, ticket abi.SealRandomness, seed abi.InteractiveSealRandomness, pieces []abi.PieceInfo, cids storage2.SectorCids) (output storage2.Commit1Out, err error) {
-	log.Debugf("jackoelv:localworker: SealCommit1")
 	sb, err := l.sb()
 	if err != nil {
 		return nil, err
@@ -168,7 +161,6 @@ func (l *LocalWorker) SealCommit1(ctx context.Context, sector abi.SectorID, tick
 }
 
 func (l *LocalWorker) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Out storage2.Commit1Out) (proof storage2.Proof, err error) {
-	log.Debugf("jackoelv:localworker: SealCommit2")
 	sb, err := l.sb()
 	if err != nil {
 		return nil, err
@@ -187,8 +179,10 @@ func (l *LocalWorker) FinalizeSector(ctx context.Context, sector abi.SectorID, k
 		return xerrors.Errorf("finalizing sector: %w", err)
 	}
 
-	if err := l.storage.Remove(ctx, sector, stores.FTUnsealed, true); err != nil {
-		return xerrors.Errorf("removing unsealed data: %w", err)
+	if len(keepUnsealed) == 0 {
+		if err := l.storage.Remove(ctx, sector, stores.FTUnsealed, true); err != nil {
+			return xerrors.Errorf("removing unsealed data: %w", err)
+		}
 	}
 
 	return nil
