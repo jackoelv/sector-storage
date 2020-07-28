@@ -20,52 +20,8 @@ func (r Resources) MultiThread() bool {
 	return r.Threads == -1
 }
 
-const MaxCachingOverhead = 32 << 30
-
 var ResourceTable = map[sealtasks.TaskType]map[abi.RegisteredSealProof]Resources{
 	sealtasks.TTAddPiece: {
-		abi.RegisteredSealProof_StackedDrg64GiBV1: Resources{ // This is probably a bit conservative
-			MaxMemory: 64 << 30,
-			MinMemory: 64 << 30,
-
-			Threads: 1,
-
-			BaseMinMemory: 1 << 30,
-		},
-		abi.RegisteredSealProof_StackedDrg32GiBV1: Resources{ // This is probably a bit conservative
-			MaxMemory: 32 << 30,
-			MinMemory: 32 << 30,
-
-			Threads: 1,
-
-			BaseMinMemory: 1 << 30,
-		},
-		abi.RegisteredSealProof_StackedDrg512MiBV1: Resources{
-			MaxMemory: 1 << 30,
-			MinMemory: 1 << 30,
-
-			Threads: 1,
-
-			BaseMinMemory: 1 << 30,
-		},
-		abi.RegisteredSealProof_StackedDrg2KiBV1: Resources{
-			MaxMemory: 2 << 10,
-			MinMemory: 2 << 10,
-
-			Threads: 1,
-
-			BaseMinMemory: 2 << 10,
-		},
-		abi.RegisteredSealProof_StackedDrg8MiBV1: Resources{
-			MaxMemory: 8 << 20,
-			MinMemory: 8 << 20,
-
-			Threads: 1,
-
-			BaseMinMemory: 8 << 20,
-		},
-	},
-	sealtasks.TTDealAddPiece: {
 		abi.RegisteredSealProof_StackedDrg64GiBV1: Resources{ // This is probably a bit conservative
 			MaxMemory: 64 << 30,
 			MinMemory: 64 << 30,
@@ -110,27 +66,27 @@ var ResourceTable = map[sealtasks.TaskType]map[abi.RegisteredSealProof]Resources
 	sealtasks.TTPreCommit1: {
 		abi.RegisteredSealProof_StackedDrg64GiBV1: Resources{
 			MaxMemory: 128 << 30,
-			MinMemory: 96 << 30,
+			MinMemory: 112 << 30,
 
 			Threads: 1,
 
-			BaseMinMemory: 60 << 30,
+			BaseMinMemory: 10 << 20,
 		},
 		abi.RegisteredSealProof_StackedDrg32GiBV1: Resources{
 			MaxMemory: 64 << 30,
-			MinMemory: 48 << 30,
+			MinMemory: 56 << 30,
 
 			Threads: 1,
 
-			BaseMinMemory: 30 << 30,
+			BaseMinMemory: 10 << 20,
 		},
 		abi.RegisteredSealProof_StackedDrg512MiBV1: Resources{
-			MaxMemory: 3 << 29, // 1.5G
-			MinMemory: 1 << 30,
+			MaxMemory: 1 << 30,
+			MinMemory: 768 << 20,
 
 			Threads: 1,
 
-			BaseMinMemory: 1 << 30,
+			BaseMinMemory: 1 << 20,
 		},
 		abi.RegisteredSealProof_StackedDrg2KiBV1: Resources{
 			MaxMemory: 2 << 10,
@@ -237,7 +193,7 @@ var ResourceTable = map[sealtasks.TaskType]map[abi.RegisteredSealProof]Resources
 	},
 	sealtasks.TTCommit2: {
 		abi.RegisteredSealProof_StackedDrg64GiBV1: Resources{
-			MaxMemory: 260 << 30, // TODO: Confirm
+			MaxMemory: 190 << 30, // TODO: Confirm
 			MinMemory: 60 << 30,
 
 			Threads: -1,

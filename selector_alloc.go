@@ -17,17 +17,16 @@ type allocSelector struct {
 	ptype stores.PathType
 }
 
-func newAllocSelector(ctx context.Context, index stores.SectorIndex, alloc stores.SectorFileType, ptype stores.PathType) (*allocSelector, error) {
+func newAllocSelector(ctx context.Context, index stores.SectorIndex, alloc stores.SectorFileType, ptype stores.PathType) *allocSelector {
 	return &allocSelector{
 		index: index,
 		alloc: alloc,
 		ptype: ptype,
-	}, nil
+	}
 }
 
 func (s *allocSelector) Ok(ctx context.Context, task sealtasks.TaskType, spt abi.RegisteredSealProof, whnd *workerHandle) (bool, error) {
 	tasks, err := whnd.w.TaskTypes(ctx)
-
 	if err != nil {
 		return false, xerrors.Errorf("getting supported worker task types: %w", err)
 	}
@@ -49,6 +48,7 @@ func (s *allocSelector) Ok(ctx context.Context, task sealtasks.TaskType, spt abi
 	if err != nil {
 		return false, xerrors.Errorf("finding best alloc storage: %w", err)
 	}
+
 	for _, info := range best {
 		if _, ok := have[info.ID]; ok {
 			return true, nil
