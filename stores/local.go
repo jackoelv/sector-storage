@@ -318,6 +318,7 @@ func (st *Local) AcquireSector(ctx context.Context, sid abi.SectorID, spt abi.Re
 		}
 
 		si, err := st.index.StorageFindSector(ctx, sid, fileType, false)
+		log.Debugf("jackoelv:local:AcquireSector:StorageFindSector: sector, %d; fileType, %s; si, %s ", sid.Number, fileType.String(), si)
 		if err != nil {
 			log.Warnf("finding existing sector %d(t:%d) failed: %+v", sid, fileType, err)
 			continue
@@ -332,8 +333,8 @@ func (st *Local) AcquireSector(ctx context.Context, sid abi.SectorID, spt abi.Re
 			if p.local == "" { // TODO: can that even be the case?
 				continue
 			}
-
 			spath := p.sectorPath(sid, fileType)
+			log.Debugf("jackoelv:local:AcquireSector:StorageFindSector:range si: sector, %d; spath, %s; info.ID, %s", sid.Number, spath, string(info.ID))
 			SetPathByType(&out, fileType, spath)
 			SetPathByType(&storageIDs, fileType, string(info.ID))
 
@@ -346,8 +347,9 @@ func (st *Local) AcquireSector(ctx context.Context, sid abi.SectorID, spt abi.Re
 		if fileType&allocate == 0 {
 			continue
 		}
-
 		sis, err := st.index.StorageBestAlloc(ctx, fileType, spt, pathType)
+		log.Debugf("jackoelv:local:AcquireSector:StorageBestAlloc: fileType, %s;pathType, %s ", fileType.String(), pathType)
+
 		if err != nil {
 			return SectorPaths{}, SectorPaths{}, xerrors.Errorf("finding best storage for allocating : %w", err)
 		}
@@ -357,6 +359,7 @@ func (st *Local) AcquireSector(ctx context.Context, sid abi.SectorID, spt abi.Re
 
 		for _, si := range sis {
 			p, ok := st.paths[si.ID]
+			log.Debugf("jackoelv:local:AcquireSector:StorageBestAlloc/range sis: si, %s;si.ID, %s ", p.sectorPath(sid, fileType), si.ID)
 			if !ok {
 				continue
 			}
@@ -374,9 +377,11 @@ func (st *Local) AcquireSector(ctx context.Context, sid abi.SectorID, spt abi.Re
 			}
 
 			// TODO: Check free space
-
 			best = p.sectorPath(sid, fileType)
 			bestID = si.ID
+			log.Debugf("jackoelv:local:AcquireSector:StorageBestAlloc/range sis: best, %s;bestID, %s ", best, bestID)
+			break
+
 		}
 
 		if best == "" {
