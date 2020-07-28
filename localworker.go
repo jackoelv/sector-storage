@@ -12,13 +12,13 @@ import (
 	"golang.org/x/xerrors"
 
 	ffi "github.com/filecoin-project/filecoin-ffi"
-	"github.com/filecoin-project/specs-actors/actors/abi"
-	storage2 "github.com/filecoin-project/specs-storage/storage"
-
 	"github.com/filecoin-project/sector-storage/ffiwrapper"
 	"github.com/filecoin-project/sector-storage/sealtasks"
 	"github.com/filecoin-project/sector-storage/stores"
 	"github.com/filecoin-project/sector-storage/storiface"
+	"github.com/filecoin-project/specs-actors/actors/abi"
+	storage2 "github.com/filecoin-project/specs-storage/storage"
+	nr "github.com/filecoin-project/storage-fsm/lib/nullreader"
 )
 
 var pathTypes = []stores.SectorFileType{stores.FTUnsealed, stores.FTSealed, stores.FTCache}
@@ -111,7 +111,23 @@ func (l *LocalWorker) AddPiece(ctx context.Context, sector abi.SectorID, epcs []
 
 	return sb.AddPiece(ctx, sector, epcs, sz, r)
 }
+func (l *LocalWorker) DealAddPiece(ctx context.Context, sector abi.SectorID, epcs []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, r io.Reader) (abi.PieceInfo, error) {
+	sb, err := l.sb()
+	if err != nil {
+		return abi.PieceInfo{}, err
+	}
 
+	return sb.AddPiece(ctx, sector, epcs, sz, r)
+}
+func (l *LocalWorker) RemoteAddPiece(ctx context.Context, sector abi.SectorID, epcs []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize) (abi.PieceInfo, error) {
+	sb, err := l.sb()
+	r := io.LimitReader(&nr.Reader{}, int64(sz))
+	if err != nil {
+		return abi.PieceInfo{}, err
+	}
+
+	return sb.AddPiece(ctx, sector, epcs, sz, r)
+}
 func (l *LocalWorker) Fetch(ctx context.Context, sector abi.SectorID, fileType stores.SectorFileType, ptype stores.PathType, am stores.AcquireMode) error {
 	log.Debugf("jackoelv:LocalWorker:Fetch:sector,%d;AcquireMode,%s;PathType,%s", sector.Number, am, ptype)
 	_, done, err := (&localWorkerPathProvider{w: l, op: am}).AcquireSector(ctx, sector, fileType, stores.FTNone, ptype)
