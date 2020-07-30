@@ -391,7 +391,7 @@ func (i *Index) StorageBestAlloc(ctx context.Context, allocate SectorFileType, s
 	out := make([]StorageInfo, len(candidates))
 	for i, candidate := range candidates {
 		available := int64(candidate.fsi.Available)
-		log.Debugf("jackoelv:index:StorageBestAlloc: i, %d;available, %d ", i, available)
+		log.Debugf("jackoelv:index:StorageBestAlloc: i, %d;available, %d MiB ", i, available / (1<<20))
 		out[i] = *candidate.info
 	}
 

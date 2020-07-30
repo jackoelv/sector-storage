@@ -3,7 +3,6 @@ package stores
 import (
 	"context"
 	"encoding/json"
-	"github.com/filecoin-project/sector-storage/fsutil"
 	"io/ioutil"
 	"math/bits"
 	"math/rand"
@@ -14,6 +13,7 @@ import (
 
 	"golang.org/x/xerrors"
 
+	"github.com/filecoin-project/sector-storage/fsutil"
 	"github.com/filecoin-project/specs-actors/actors/abi"
 )
 
@@ -89,14 +89,15 @@ func (p *path) stat(ls LocalStorage) (fsutil.FsStat, error) {
 			}
 
 			used, err := ls.DiskUsage(p.sectorPath(id, fileType))
-			log.Warnf("jackoelv stat.Reserved before: %d, jackoelv used:  %d, stat.Available: %d", stat.Reserved/(1<<20), used/(1<<20), stat.Available/(1<<20))
+			log.Warnf("jackoelv stat.Reserved before: %d MiB, jackoelv used:  %d MiB,  stat.Available: %d MiB", stat.Reserved/(1<<20), used/(1<<20), stat.Available/(1<<20))
 			if err != nil {
 				log.Errorf("getting disk usage of '%s': %+v", p.sectorPath(id, fileType), err)
 				continue
 			}
 
 			stat.Reserved -= used
-			log.Warnf("jackoelv stat.Reserved after: %d, jackoelv used:  %d, stat.Available:  %d", stat.Reserved/(1<<20), used/(1<<20), stat.Available/(1<<20))
+			log.Warnf("jackoelv stat.Reserved after: %d MiB, jackoelv used:  %d MiB,  stat.Available: %d MiB", stat.Reserved/(1<<20), used/(1<<20), stat.Available/(1<<20))
+
 		}
 	}
 
@@ -106,9 +107,9 @@ func (p *path) stat(ls LocalStorage) (fsutil.FsStat, error) {
 	}
 
 	stat.Available -= stat.Reserved
-	log.Warnf("jackoelv stat.Reserved after -=: %d stat.Available:  %d", stat.Reserved/(1<<20), stat.Available/(1<<20))
+	log.Warnf("jackoelv stat.Reserved after -=: %d MiB stat.Available:  %d MiB", stat.Reserved/(1<<20), stat.Available/(1<<20))
 	if stat.Available < 0 {
-		log.Warnf("jackoelv stat.Available < 0 after -=: %d, stat.Available:  %d", stat.Reserved/(1<<20), stat.Available/(1<<20))
+		log.Warnf("jackoelv stat.Available < 0 after -=: %d MiB, stat.Available:  %d MiB", stat.Reserved/(1<<20), stat.Available/(1<<20))
 		stat.Available = 0
 	}
 
@@ -183,6 +184,10 @@ func (st *Local) OpenPath(ctx context.Context, p string) error {
 		}
 
 		for _, ent := range ents {
+			if ent.Name() == FetchTempSubdir {
+				continue
+			}
+
 			sid, err := ParseSectorID(ent.Name())
 			if err != nil {
 				return xerrors.Errorf("parse sector id %s: %w", ent.Name(), err)
@@ -337,8 +342,8 @@ func (st *Local) AcquireSector(ctx context.Context, sid abi.SectorID, spt abi.Re
 			if p.local == "" { // TODO: can that even be the case?
 				continue
 			}
+
 			spath := p.sectorPath(sid, fileType)
-			//log.Debugf("jackoelv:local:AcquireSector:StorageFindSector:range si: sector, %d; spath, %s; info.ID, %s", sid.Number, spath, string(info.ID))
 			SetPathByType(&out, fileType, spath)
 			SetPathByType(&storageIDs, fileType, string(info.ID))
 
@@ -351,9 +356,9 @@ func (st *Local) AcquireSector(ctx context.Context, sid abi.SectorID, spt abi.Re
 		if fileType&allocate == 0 {
 			continue
 		}
-		sis, err := st.index.StorageBestAlloc(ctx, fileType, spt, pathType)
-		log.Debugf("jackoelv:local:AcquireSector:StorageBestAlloc: fileType, %s;pathType, %s ", fileType.String(), pathType)
 
+		sis, err := st.index.StorageBestAlloc(ctx, fileType, spt, pathType)
+		log.Debugf("jackoelv:local:AcquireSector:StorageBestAlloc: fileType, %s;pathType, %s, sis is: %s ", fileType.String(), pathType, sis)
 		if err != nil {
 			return SectorPaths{}, SectorPaths{}, xerrors.Errorf("finding best storage for allocating : %w", err)
 		}
@@ -381,11 +386,11 @@ func (st *Local) AcquireSector(ctx context.Context, sid abi.SectorID, spt abi.Re
 			}
 
 			// TODO: Check free space
+
 			best = p.sectorPath(sid, fileType)
 			bestID = si.ID
 			log.Debugf("jackoelv:local:AcquireSector:StorageBestAlloc/range sis: best, %s;bestID, %s ", best, bestID)
 			break
-
 		}
 
 		if best == "" {

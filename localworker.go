@@ -12,12 +12,13 @@ import (
 	"golang.org/x/xerrors"
 
 	ffi "github.com/filecoin-project/filecoin-ffi"
+	"github.com/filecoin-project/specs-actors/actors/abi"
+	storage2 "github.com/filecoin-project/specs-storage/storage"
+
 	"github.com/filecoin-project/sector-storage/ffiwrapper"
 	"github.com/filecoin-project/sector-storage/sealtasks"
 	"github.com/filecoin-project/sector-storage/stores"
 	"github.com/filecoin-project/sector-storage/storiface"
-	"github.com/filecoin-project/specs-actors/actors/abi"
-	storage2 "github.com/filecoin-project/specs-storage/storage"
 	nr "github.com/filecoin-project/storage-fsm/lib/nullreader"
 )
 
@@ -61,6 +62,7 @@ type localWorkerPathProvider struct {
 }
 
 func (l *localWorkerPathProvider) AcquireSector(ctx context.Context, sector abi.SectorID, existing stores.SectorFileType, allocate stores.SectorFileType, sealing stores.PathType) (stores.SectorPaths, func(), error) {
+
 	paths, storageIDs, err := l.w.storage.AcquireSector(ctx, sector, l.w.scfg.SealProofType, existing, allocate, sealing, l.op)
 	if err != nil {
 		return stores.SectorPaths{}, nil, err
@@ -71,7 +73,7 @@ func (l *localWorkerPathProvider) AcquireSector(ctx context.Context, sector abi.
 		return stores.SectorPaths{}, nil, xerrors.Errorf("reserving storage space: %w", err)
 	}
 
-	//log.Debugf("jackoelv:localworker:AcquireSector:acquired sector %d (e:%d; a:%d): %v", sector, existing, allocate, paths)
+	log.Debugf("jackoelv:localworker:acquired sector %d (e:%d; a:%d): %v", sector, existing, allocate, paths)
 
 	return paths, func() {
 		releaseStorage()
@@ -105,12 +107,10 @@ func (l *LocalWorker) NewSector(ctx context.Context, sector abi.SectorID) error 
 
 func (l *LocalWorker) AddPiece(ctx context.Context, sector abi.SectorID, epcs []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, r io.Reader) (abi.PieceInfo, error) {
 	sb, err := l.sb()
-	log.Debugf("jackoelv:LocalWorker:AddPiece before")
-
 	if err != nil {
 		return abi.PieceInfo{}, err
 	}
-	log.Debugf("jackoelv:LocalWorker:AddPiece after")
+
 	return sb.AddPiece(ctx, sector, epcs, sz, r)
 }
 func (l *LocalWorker) DealAddPiece(ctx context.Context, sector abi.SectorID, epcs []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, r io.Reader) (abi.PieceInfo, error) {
@@ -122,18 +122,18 @@ func (l *LocalWorker) DealAddPiece(ctx context.Context, sector abi.SectorID, epc
 	return sb.AddPiece(ctx, sector, epcs, sz, r)
 }
 func (l *LocalWorker) RemoteAddPiece(ctx context.Context, sector abi.SectorID, epcs []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize) (abi.PieceInfo, error) {
-	sb, err := l.sb()
 	log.Debugf("jackoelv:LocalWorker:RemoteAddPiece before")
+	sb, err := l.sb()
 	r := io.LimitReader(&nr.Reader{}, int64(sz))
 	if err != nil {
 		return abi.PieceInfo{}, err
 	}
-	log.Debugf("jackoelv:LocalWorker:RemoteAddPiece after")
 	log.Debugf("jackoelv:LocalWorker:RemoteAddPiece after,ctx:%s;sector:%s;epcs:%s;sz:%s;r:%s", ctx, sector, epcs, sz, r)
+
 	return sb.AddPiece(ctx, sector, epcs, sz, r)
 }
+
 func (l *LocalWorker) Fetch(ctx context.Context, sector abi.SectorID, fileType stores.SectorFileType, ptype stores.PathType, am stores.AcquireMode) error {
-	//log.Debugf("jackoelv:LocalWorker:Fetch:sector,%d;AcquireMode,%s;PathType,%s", sector.Number, am, ptype)
 	_, done, err := (&localWorkerPathProvider{w: l, op: am}).AcquireSector(ctx, sector, fileType, stores.FTNone, ptype)
 	if err != nil {
 		return err

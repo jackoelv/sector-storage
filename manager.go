@@ -32,6 +32,7 @@ var Commit2Priority = 40
 var PreCommit1Priority = 30
 var UnsealPriority = 65
 var ReadPiecePriority = 65
+
 var log = logging.Logger("advmgr")
 
 var ErrNoWorkers = errors.New("no suitable workers found")
@@ -87,6 +88,8 @@ type Manager struct {
 }
 
 type SealerConfig struct {
+	ParallelFetchLimit int
+
 	// Local worker config
 	AllowPreCommit1 bool
 	AllowPreCommit2 bool
@@ -107,7 +110,7 @@ func New(ctx context.Context, ls stores.LocalStorage, si stores.SectorIndex, cfg
 		return nil, xerrors.Errorf("creating prover instance: %w", err)
 	}
 
-	stor := stores.NewRemote(lstor, si, http.Header(sa))
+	stor := stores.NewRemote(lstor, si, http.Header(sa), sc.ParallelFetchLimit)
 
 	m := &Manager{
 		scfg: cfg,
@@ -256,7 +259,7 @@ func (m *Manager) ReadPiece(ctx context.Context, sink io.Writer, sector abi.Sect
 	if err != nil {
 		return xerrors.Errorf("creating readPiece selector: %w", err)
 	}
-	ctx = WithPriority(ctx, ReadPiecePriority)
+ 	ctx = WithPriority(ctx, ReadPiecePriority)
 	err = m.sched.Schedule(ctx, sector, sealtasks.TTReadUnsealed, selector, schedFetch(sector, stores.FTUnsealed, stores.PathSealing, stores.AcquireMove), func(ctx context.Context, w Worker) error {
 		return w.ReadPiece(ctx, sink, sector, offset, size)
 	})
@@ -291,16 +294,14 @@ func (m *Manager) DealAddPiece(ctx context.Context, sector abi.SectorID, existin
 	}
 
 	var out abi.PieceInfo
-	//ctx = WithPriority(ctx, AddPiecePriority)
 	err = m.sched.Schedule(ctx, sector, sealtasks.TTDealAddPiece, selector, schedNop, func(ctx context.Context, w Worker) error {
 		winfo, _ := w.Info(ctx)
-		log.Warnf("jackoelv AddPiece START, Sector is : %d , Priority is %d : Worker is : %s", sector.Number, getPriority(ctx), winfo.Hostname)
+		log.Warnf("jackoelv DealAddPiece START, Sector is : %d , Priority is %d : Worker is : %s", sector.Number, getPriority(ctx), winfo.Hostname)
 		p, err := w.AddPiece(ctx, sector, existingPieces, sz, r)
 		if err != nil {
 			return err
 		}
 		out = p
-		log.Warnf("jackoelv AddPiece END, Sector is : %d , Priority is %d : Worker is : %s", sector.Number, getPriority(ctx), winfo.Hostname)
 		return nil
 	})
 
@@ -327,7 +328,6 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 	}
 
 	var out abi.PieceInfo
-	//ctx = WithPriority(ctx, AddPiecePriority)
 	err = m.sched.Schedule(ctx, sector, sealtasks.TTAddPiece, selector, schedNop, func(ctx context.Context, w Worker) error {
 		winfo, _ := w.Info(ctx)
 		log.Warnf("jackoelv AddPiece START, Sector is : %d , Priority is %d : Worker is : %s", sector.Number, getPriority(ctx), winfo.Hostname)
@@ -336,7 +336,6 @@ func (m *Manager) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 			return err
 		}
 		out = p
-		log.Warnf("jackoelv AddPiece END, Sector is : %d , Priority is %d : Worker is : %s", sector.Number, getPriority(ctx), winfo.Hostname)
 		return nil
 	})
 
@@ -363,7 +362,6 @@ func (m *Manager) SealPreCommit1(ctx context.Context, sector abi.SectorID, ticke
 			return err
 		}
 		out = p
-		log.Warnf("jackoelv SealPreCommit1 END, Sector is : %d , Priority is %d : Worker is : %s", sector.Number, getPriority(ctx), winfo.Hostname)
 		return nil
 	})
 
@@ -391,7 +389,6 @@ func (m *Manager) SealPreCommit2(ctx context.Context, sector abi.SectorID, phase
 			return err
 		}
 		out = p
-		log.Warnf("jackoelv SealPreCommit2 END, Sector is : %d , Priority is %d : Worker is : %s", sector.Number, getPriority(ctx), winfo.Hostname)
 		return nil
 	})
 	return out, err
@@ -420,8 +417,7 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 		if err != nil {
 			return err
 		}
-		out = p
-		log.Warnf("jackoelv SealCommit1 END, Sector is : %d , Priority is %d : Worker is : %s", sector.Number, getPriority(ctx), winfo.Hostname)
+		out = p		
 		return nil
 	})
 	return out, err
@@ -429,7 +425,7 @@ func (m *Manager) SealCommit1(ctx context.Context, sector abi.SectorID, ticket a
 
 func (m *Manager) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Out storage.Commit1Out) (out storage.Proof, err error) {
 	selector := newTaskSelector()
-	ctx = WithPriority(ctx, Commit2Priority)
+
 	err = m.sched.Schedule(ctx, sector, sealtasks.TTCommit2, selector, schedNop, func(ctx context.Context, w Worker) error {
 		winfo, _ := w.Info(ctx)
 		log.Warnf("jackoelv SealCommit2 START, Sector is : %d , Priority is %d : Worker is : %s", sector.Number, getPriority(ctx), winfo.Hostname)
@@ -438,7 +434,6 @@ func (m *Manager) SealCommit2(ctx context.Context, sector abi.SectorID, phase1Ou
 			return err
 		}
 		out = p
-		log.Warnf("jackoelv SealCommit2 END, Sector is : %d , Priority is %d : Worker is : %s", sector.Number, getPriority(ctx), winfo.Hostname)
 		return nil
 	})
 
@@ -486,7 +481,7 @@ func (m *Manager) FinalizeSector(ctx context.Context, sector abi.SectorID, keepU
 			moveUnsealed = stores.FTNone
 		}
 	}
-	ctx = WithPriority(ctx, MovePriority)
+  ctx = WithPriority(ctx, MovePriority)
 	err = m.sched.Schedule(ctx, sector, sealtasks.TTFetch, fetchSel,
 		schedFetch(sector, stores.FTCache|stores.FTSealed|moveUnsealed, stores.PathStorage, stores.AcquireMove),
 		func(ctx context.Context, w Worker) error {
@@ -528,7 +523,7 @@ func (m *Manager) Remove(ctx context.Context, sector abi.SectorID) error {
 	if err != nil {
 		return xerrors.Errorf("creating selector: %w", err)
 	}
-	ctx = WithPriority(ctx, RemovePriority)
+
 	return m.sched.Schedule(ctx, sector, sealtasks.TTFinalize, selector,
 		schedFetch(sector, stores.FTCache|stores.FTSealed|unsealed, stores.PathStorage, stores.AcquireMove),
 		func(ctx context.Context, w Worker) error {
@@ -552,6 +547,10 @@ func (m *Manager) StorageLocal(ctx context.Context) (map[stores.ID]string, error
 
 func (m *Manager) FsStat(ctx context.Context, id stores.ID) (fsutil.FsStat, error) {
 	return m.storage.FsStat(ctx, id)
+}
+
+func (m *Manager) SchedDiag(ctx context.Context) (interface{}, error) {
+	return m.sched.Info(ctx)
 }
 
 func (m *Manager) Close(ctx context.Context) error {

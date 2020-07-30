@@ -4,11 +4,11 @@ type TaskType string
 
 const (
 	TTDealAddPiece TaskType = "seal/v0/dealaddpiece"
-	TTAddPiece     TaskType = "seal/v0/addpiece"
-	TTPreCommit1   TaskType = "seal/v0/precommit/1"
-	TTPreCommit2   TaskType = "seal/v0/precommit/2"
-	TTCommit1      TaskType = "seal/v0/commit/1" // NOTE: We use this to transfer the sector into miner-local storage for now; Don't use on workers!
-	TTCommit2      TaskType = "seal/v0/commit/2"
+	TTAddPiece   TaskType = "seal/v0/addpiece"
+	TTPreCommit1 TaskType = "seal/v0/precommit/1"
+	TTPreCommit2 TaskType = "seal/v0/precommit/2"
+	TTCommit1    TaskType = "seal/v0/commit/1" // NOTE: We use this to transfer the sector into miner-local storage for now; Don't use on workers!
+	TTCommit2    TaskType = "seal/v0/commit/2"
 
 	TTFinalize TaskType = "seal/v0/finalize"
 
@@ -18,7 +18,7 @@ const (
 )
 
 var order = map[TaskType]int{
-	TTDealAddPiece: 7,
+  TTDealAddPiece: 7,
 	TTAddPiece:     7,
 	TTPreCommit1:   6,
 	TTPreCommit2:   5,
@@ -32,7 +32,7 @@ var order = map[TaskType]int{
 
 var shortNames = map[TaskType]string{
 	TTDealAddPiece: "DAP",
-	TTAddPiece:     "AP ",
+	TTAddPiece: "AP ",
 
 	TTPreCommit1: "PC1",
 	TTPreCommit2: "PC2",
