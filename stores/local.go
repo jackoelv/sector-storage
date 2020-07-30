@@ -89,12 +89,14 @@ func (p *path) stat(ls LocalStorage) (fsutil.FsStat, error) {
 			}
 
 			used, err := ls.DiskUsage(p.sectorPath(id, fileType))
+			log.Warnf("jackoelv stat.Reserved before: %d, jackoelv used:  %d, stat.Available: %d", stat.Reserved, used, stat.Available)
 			if err != nil {
 				log.Errorf("getting disk usage of '%s': %+v", p.sectorPath(id, fileType), err)
 				continue
 			}
 
 			stat.Reserved -= used
+			log.Warnf("jackoelv stat.Reserved after: %d, jackoelv used:  %d, stat.Available:  %d", stat.Reserved, used, stat.Available)
 		}
 	}
 
@@ -104,7 +106,9 @@ func (p *path) stat(ls LocalStorage) (fsutil.FsStat, error) {
 	}
 
 	stat.Available -= stat.Reserved
+	log.Warnf("jackoelv stat.Reserved after -=: %d, jackoelv used:  %d, stat.Available:  %d", stat.Reserved, used, stat.Available)
 	if stat.Available < 0 {
+		log.Warnf("jackoelv stat.Available < 0 after -=: %d, jackoelv used:  %d, stat.Available:  %d", stat.Reserved, used, stat.Available)
 		stat.Available = 0
 	}
 
@@ -334,7 +338,7 @@ func (st *Local) AcquireSector(ctx context.Context, sid abi.SectorID, spt abi.Re
 				continue
 			}
 			spath := p.sectorPath(sid, fileType)
-			log.Debugf("jackoelv:local:AcquireSector:StorageFindSector:range si: sector, %d; spath, %s; info.ID, %s", sid.Number, spath, string(info.ID))
+			//log.Debugf("jackoelv:local:AcquireSector:StorageFindSector:range si: sector, %d; spath, %s; info.ID, %s", sid.Number, spath, string(info.ID))
 			SetPathByType(&out, fileType, spath)
 			SetPathByType(&storageIDs, fileType, string(info.ID))
 
@@ -359,7 +363,7 @@ func (st *Local) AcquireSector(ctx context.Context, sid abi.SectorID, spt abi.Re
 
 		for _, si := range sis {
 			p, ok := st.paths[si.ID]
-			log.Debugf("jackoelv:local:AcquireSector:StorageBestAlloc/range sis: si, %s;si.ID, %s ", p.sectorPath(sid, fileType), si.ID)
+			//log.Debugf("jackoelv:local:AcquireSector:StorageBestAlloc/range sis: si, %s;si.ID, %s ", p.sectorPath(sid, fileType), si.ID)
 			if !ok {
 				continue
 			}

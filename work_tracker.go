@@ -107,6 +107,11 @@ func (t *trackedWorker) AddPiece(ctx context.Context, sector abi.SectorID, piece
 
 	return t.Worker.AddPiece(ctx, sector, pieceSizes, newPieceSize, pieceData)
 }
+func (t *trackedWorker) DealAddPiece(ctx context.Context, sector abi.SectorID, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, pieceData storage.Data) (abi.PieceInfo, error) {
+	defer t.tracker.track(sector, sealtasks.TTDealAddPiece)()
+
+	return t.Worker.AddPiece(ctx, sector, pieceSizes, newPieceSize, pieceData)
+}
 
 func (t *trackedWorker) Fetch(ctx context.Context, s abi.SectorID, ft stores.SectorFileType, ptype stores.PathType, am stores.AcquireMode) error {
 	defer t.tracker.track(s, sealtasks.TTFetch)()

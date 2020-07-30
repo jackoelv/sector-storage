@@ -179,6 +179,7 @@ func (sb *Sealer) DealAddPiece(ctx context.Context, sector abi.SectorID, existin
 }
 
 func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPieceSizes []abi.UnpaddedPieceSize, pieceSize abi.UnpaddedPieceSize, file storage.Data) (abi.PieceInfo, error) {
+	log.Errorf("jackoelv,sb.AddPiece begin 1")
 	var offset abi.UnpaddedPieceSize
 	for _, size := range existingPieceSizes {
 		offset += size
@@ -189,6 +190,7 @@ func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 	if offset.Padded()+pieceSize.Padded() > maxPieceSize {
 		return abi.PieceInfo{}, xerrors.Errorf("can't add %d byte piece to sector %v with %d bytes of existing pieces", pieceSize, sector, offset)
 	}
+	log.Errorf("jackoelv,sb.AddPiece begin 2")
 
 	var err error
 	var done func()
@@ -198,7 +200,7 @@ func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 		if done != nil {
 			done()
 		}
-
+		log.Errorf("jackoelv,sb.AddPiece begin n")
 		if stagedFile != nil {
 			if err := stagedFile.Close(); err != nil {
 				log.Errorf("closing staged file: %+v", err)
@@ -207,7 +209,9 @@ func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 	}()
 
 	var stagedPath stores.SectorPaths
+	log.Errorf("jackoelv,sb.AddPiece begin 3")
 	if len(existingPieceSizes) == 0 {
+		log.Errorf("jackoelv,sb.AddPiece begin 4")
 		stagedPath, done, err = sb.sectors.AcquireSector(ctx, sector, 0, stores.FTUnsealed, stores.PathSealing)
 		if err != nil {
 			return abi.PieceInfo{}, xerrors.Errorf("acquire unsealed sector: %w", err)
@@ -228,7 +232,7 @@ func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 			return abi.PieceInfo{}, xerrors.Errorf("opening unsealed sector file: %w", err)
 		}
 	}
-
+	log.Errorf("jackoelv,sb.AddPiece begin 5")
 	w, err := stagedFile.Writer(storiface.UnpaddedByteIndex(offset).Padded(), pieceSize.Padded())
 	if err != nil {
 		return abi.PieceInfo{}, xerrors.Errorf("getting partial file writer: %w", err)
@@ -271,7 +275,7 @@ func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 			PieceCID: c,
 		})
 	}
-
+	log.Errorf("jackoelv,sb.AddPiece begin 6")
 	if err := pw.Close(); err != nil {
 		return abi.PieceInfo{}, xerrors.Errorf("closing padded writer: %w", err)
 	}
@@ -279,25 +283,29 @@ func (sb *Sealer) AddPiece(ctx context.Context, sector abi.SectorID, existingPie
 	if err := stagedFile.MarkAllocated(storiface.UnpaddedByteIndex(offset).Padded(), pieceSize.Padded()); err != nil {
 		return abi.PieceInfo{}, xerrors.Errorf("marking data range as allocated: %w", err)
 	}
-
+	log.Errorf("jackoelv,sb.AddPiece begin 7")
 	if err := stagedFile.Close(); err != nil {
 		return abi.PieceInfo{}, err
 	}
 	stagedFile = nil
 
 	if len(pieceCids) == 1 {
+		log.Errorf("jackoelv,sb.AddPiece begin xx here out!!!")
 		return pieceCids[0], nil
 	}
-
+	log.Errorf("jackoelv,sb.AddPiece begin 8")
 	pieceCID, err := ffi.GenerateUnsealedCID(sb.sealProofType, pieceCids)
 	if err != nil {
 		return abi.PieceInfo{}, xerrors.Errorf("generate unsealed CID: %w", err)
 	}
-
+	log.Errorf("jackoelv,sb.AddPiece begin 9")
 	// validate that the pieceCID was properly formed
 	if _, err := commcid.CIDToPieceCommitmentV1(pieceCID); err != nil {
 		return abi.PieceInfo{}, err
 	}
+
+	log.Errorf("jackoelv,sb.AddPiece end end end, abi.PieceInfo:%s", abi.PieceInfo{Size: pieceSize.Padded(),
+		PieceCID: pieceCID})
 
 	return abi.PieceInfo{
 		Size:     pieceSize.Padded(),

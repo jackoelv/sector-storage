@@ -71,7 +71,7 @@ func (l *localWorkerPathProvider) AcquireSector(ctx context.Context, sector abi.
 		return stores.SectorPaths{}, nil, xerrors.Errorf("reserving storage space: %w", err)
 	}
 
-	log.Debugf("jackoelv:localworker:AcquireSector:acquired sector %d (e:%d; a:%d): %v", sector, existing, allocate, paths)
+	//log.Debugf("jackoelv:localworker:AcquireSector:acquired sector %d (e:%d; a:%d): %v", sector, existing, allocate, paths)
 
 	return paths, func() {
 		releaseStorage()
@@ -105,10 +105,12 @@ func (l *LocalWorker) NewSector(ctx context.Context, sector abi.SectorID) error 
 
 func (l *LocalWorker) AddPiece(ctx context.Context, sector abi.SectorID, epcs []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, r io.Reader) (abi.PieceInfo, error) {
 	sb, err := l.sb()
+	log.Debugf("jackoelv:LocalWorker:AddPiece before")
+
 	if err != nil {
 		return abi.PieceInfo{}, err
 	}
-
+	log.Debugf("jackoelv:LocalWorker:AddPiece after")
 	return sb.AddPiece(ctx, sector, epcs, sz, r)
 }
 func (l *LocalWorker) DealAddPiece(ctx context.Context, sector abi.SectorID, epcs []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize, r io.Reader) (abi.PieceInfo, error) {
@@ -121,15 +123,17 @@ func (l *LocalWorker) DealAddPiece(ctx context.Context, sector abi.SectorID, epc
 }
 func (l *LocalWorker) RemoteAddPiece(ctx context.Context, sector abi.SectorID, epcs []abi.UnpaddedPieceSize, sz abi.UnpaddedPieceSize) (abi.PieceInfo, error) {
 	sb, err := l.sb()
+	log.Debugf("jackoelv:LocalWorker:RemoteAddPiece before")
 	r := io.LimitReader(&nr.Reader{}, int64(sz))
 	if err != nil {
 		return abi.PieceInfo{}, err
 	}
-
+	log.Debugf("jackoelv:LocalWorker:RemoteAddPiece after")
+	log.Debugf("jackoelv:LocalWorker:RemoteAddPiece after,ctx:%s;sector:%s;epcs:%s;sz:%s;r:%s", ctx, sector, epcs, sz, r)
 	return sb.AddPiece(ctx, sector, epcs, sz, r)
 }
 func (l *LocalWorker) Fetch(ctx context.Context, sector abi.SectorID, fileType stores.SectorFileType, ptype stores.PathType, am stores.AcquireMode) error {
-	log.Debugf("jackoelv:LocalWorker:Fetch:sector,%d;AcquireMode,%s;PathType,%s", sector.Number, am, ptype)
+	//log.Debugf("jackoelv:LocalWorker:Fetch:sector,%d;AcquireMode,%s;PathType,%s", sector.Number, am, ptype)
 	_, done, err := (&localWorkerPathProvider{w: l, op: am}).AcquireSector(ctx, sector, fileType, stores.FTNone, ptype)
 	if err != nil {
 		return err

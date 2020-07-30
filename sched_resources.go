@@ -69,11 +69,17 @@ func (a *activeResources) canHandleRequest(needRes Resources, wid WorkerID, res 
 	}
 
 	if needRes.MultiThread() {
-		if a.cpuUse > 0 {
+		if a.cpuUse > 10 {
 			log.Debugf("sched: not scheduling on worker %d; multicore process needs %d threads, %d in use, target %d", wid, res.CPUs, a.cpuUse, res.CPUs)
 			return false
 		}
 	} else {
+		if uint64(needRes.Threads) == 1 {
+			return true
+		}
+		if a.cpuUse <= 10 {
+			return true
+		}
 		if a.cpuUse+uint64(needRes.Threads) > res.CPUs {
 			log.Debugf("sched: not scheduling on worker %d; not enough threads, need %d, %d in use, target %d", wid, needRes.Threads, a.cpuUse, res.CPUs)
 			return false
