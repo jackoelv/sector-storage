@@ -67,19 +67,16 @@ func (a *activeResources) canHandleRequest(needRes Resources, wid WorkerID, res 
 		log.Debugf("sched: not scheduling on worker %d; not enough virtual memory - need: %dM, have %dM", wid, maxNeedMem/mib, (res.MemSwap+res.MemPhysical)/mib)
 		return false
 	}
-	log.Debugf("jackoelv:sched: always assign tasks without cpuUse, scheduling on worker %d; multicore process needs %d threads, %d in use, target %d", wid, res.CPUs, a.cpuUse, res.CPUs)
+
 	if needRes.MultiThread() {
 		if a.cpuUse > 0 {
-			// log.Debugf("jackoelv:always assign sched: not scheduling on worker %d; multicore process needs %d threads, %d in use, target %d", wid, res.CPUs, a.cpuUse, res.CPUs)
-			// return false
+			log.Debugf("sched: not scheduling on worker %d; multicore process needs %d threads, %d in use, target %d", wid, res.CPUs, a.cpuUse, res.CPUs)
+			return false
 		}
 	} else {
-		// if uint64(needRes.Threads) == 1 {
-		// 	return true
-		// }
 		if a.cpuUse+uint64(needRes.Threads) > res.CPUs {
-			// log.Debugf("sched: not scheduling on worker %d; not enough threads, need %d, %d in use, target %d", wid, needRes.Threads, a.cpuUse, res.CPUs)
-			// return false
+			log.Debugf("sched: not scheduling on worker %d; not enough threads, need %d, %d in use, target %d", wid, needRes.Threads, a.cpuUse, res.CPUs)
+			return false
 		}
 	}
 

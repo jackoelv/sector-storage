@@ -101,11 +101,15 @@ func (t *trackedWorker) FinalizeSector(ctx context.Context, sector abi.SectorID,
 
 	return t.Worker.FinalizeSector(ctx, sector, keepUnsealed)
 }
+<<<<<<< HEAD
 func (t *trackedWorker) DealAddPiece(ctx context.Context, sector abi.SectorID, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, pieceData storage.Data) (abi.PieceInfo, error) {
 	defer t.tracker.track(sector, sealtasks.TTAddPiece)()
 
 	return t.Worker.DealAddPiece(ctx, sector, pieceSizes, newPieceSize, pieceData)
 }
+=======
+
+>>>>>>> fccali810
 func (t *trackedWorker) AddPiece(ctx context.Context, sector abi.SectorID, pieceSizes []abi.UnpaddedPieceSize, newPieceSize abi.UnpaddedPieceSize, pieceData storage.Data) (abi.PieceInfo, error) {
 	defer t.tracker.track(sector, sealtasks.TTAddPiece)()
 
@@ -124,7 +128,11 @@ func (t *trackedWorker) UnsealPiece(ctx context.Context, id abi.SectorID, index 
 	return t.Worker.UnsealPiece(ctx, id, index, size, randomness, cid)
 }
 
+<<<<<<< HEAD
 func (t *trackedWorker) ReadPiece(ctx context.Context, writer io.Writer, id abi.SectorID, index storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize) error {
+=======
+func (t *trackedWorker) ReadPiece(ctx context.Context, writer io.Writer, id abi.SectorID, index storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize) (bool, error) {
+>>>>>>> fccali810
 	defer t.tracker.track(id, sealtasks.TTReadUnsealed)()
 
 	return t.Worker.ReadPiece(ctx, writer, id, index, size)

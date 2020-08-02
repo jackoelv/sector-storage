@@ -145,10 +145,15 @@ func openPartialFile(maxPieceSize abi.PaddedPieceSize, path string) (*partialFil
 			return xerrors.Errorf("getting trailer run iterator: %w", err)
 		}
 
-		lastSet, err := rlepluslazy.LastIndex(it, true)
+		f, err := rlepluslazy.Fill(it)
+		if err != nil {
+			return xerrors.Errorf("filling bitfield: %w", err)
+		}
+		lastSet, err := rlepluslazy.Count(f)
 		if err != nil {
 			return xerrors.Errorf("finding last set byte index: %w", err)
 		}
+
 		if lastSet > uint64(maxPieceSize) {
 			return xerrors.Errorf("last set byte at index higher than sector size: %d > %d", lastSet, maxPieceSize)
 		}
@@ -272,6 +277,25 @@ func (pf *partialFile) Reader(offset storiface.PaddedByteIndex, size abi.PaddedP
 
 func (pf *partialFile) Allocated() (rlepluslazy.RunIterator, error) {
 	return pf.allocated.RunIterator()
+}
+
+func (pf *partialFile) HasAllocated(offset storiface.UnpaddedByteIndex, size abi.UnpaddedPieceSize) (bool, error) {
+	have, err := pf.Allocated()
+	if err != nil {
+		return false, err
+	}
+
+	u, err := rlepluslazy.And(have, pieceRun(offset.Padded(), size.Padded()))
+	if err != nil {
+		return false, err
+	}
+
+	uc, err := rlepluslazy.Count(u)
+	if err != nil {
+		return false, err
+	}
+
+	return abi.PaddedPieceSize(uc) == size.Padded(), nil
 }
 
 func pieceRun(offset storiface.PaddedByteIndex, size abi.PaddedPieceSize) rlepluslazy.RunIterator {
